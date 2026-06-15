@@ -1,0 +1,8 @@
+{
+  "name": "background-jobs.simple-status.v1-reference",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/server.ts"
+  }
+}

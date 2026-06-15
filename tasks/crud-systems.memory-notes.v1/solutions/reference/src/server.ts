@@ -1,0 +1,35 @@
+const port = Number(Bun.env.PORT ?? 3000);
+const notes: Array<{ id: string; text: string }> = [];
+
+Bun.serve({
+  port,
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/notes") {
+      return Response.json({ notes }, { status: 200 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/notes") {
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return Response.json({ error: "invalid_text" }, { status: 422 });
+      }
+
+      const text = typeof body === "object" && body !== null && "text" in body ? body.text : undefined;
+      if (typeof text !== "string" || text.trim().length === 0) {
+        return Response.json({ error: "invalid_text" }, { status: 422 });
+      }
+
+      const note = { id: `note_${notes.length + 1}`, text };
+      notes.push(note);
+      return Response.json(note, { status: 201 });
+    }
+
+    return Response.json({ error: "not_found" }, { status: 404 });
+  },
+});
+
+console.log(`reference server listening on ${port}`);

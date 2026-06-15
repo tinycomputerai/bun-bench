@@ -1,0 +1,21 @@
+const port = Number(Bun.env.PORT ?? 3000);
+
+Bun.serve({
+  port,
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (request.method === "POST" && url.pathname === "/echo") {
+      try {
+        const body = await request.json();
+        return Response.json(body, { status: 200 });
+      } catch {
+        return Response.json({ error: "invalid_json" }, { status: 400 });
+      }
+    }
+
+    return Response.json({ error: "not_found" }, { status: 404 });
+  },
+});
+
+console.log(`reference server listening on ${port}`);

@@ -1,0 +1,21 @@
+const port = Number(Bun.env.PORT ?? 3000);
+const validAuthorization = "Bearer benchmark-token";
+
+Bun.serve({
+  port,
+  fetch(request) {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/profile") {
+      if (request.headers.get("authorization") !== validAuthorization) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+
+      return Response.json({ id: "user_1", email: "user@example.com" }, { status: 200 });
+    }
+
+    return Response.json({ error: "not_found" }, { status: 404 });
+  },
+});
+
+console.log(`reference server listening on ${port}`);

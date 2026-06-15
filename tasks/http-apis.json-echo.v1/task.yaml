@@ -1,0 +1,186 @@
+id: http-apis.json-echo.v1
+spec_version: 0.1.0
+task_version: 1.0.0
+title: JSON echo endpoint
+description: Build a small Bun HTTP endpoint that accepts a JSON request body and returns it unchanged.
+difficulty:
+  level: 1
+  rationale: Requires one POST endpoint, JSON parsing, and JSON error handling.
+  expected_code_size:
+    min_lines: 25
+    max_lines: 140
+  expected_concepts:
+    - Bun HTTP server
+    - JSON parsing
+    - error responses
+category: http-apis
+tags:
+  - http-apis
+  - bun
+  - json
+  - echo
+dataset:
+  split: dev
+  leakage_group: http-apis.json-echo
+  trainable: true
+curriculum:
+  skill_atoms:
+    - bun-http-server
+    - json-body-parsing
+    - json-response
+  small_model_suitability: high
+rollout_capture:
+  enabled: true
+benchmarking:
+  agent_metrics:
+    - wall_time_ms
+    - input_tokens
+    - output_tokens
+    - tool_calls
+  app_metrics:
+    - readiness_ms
+    - p95_latency_ms
+    - max_rss_mb
+instruction:
+  prompt_file: prompt.md
+  summary: Implement POST /echo for JSON payloads.
+  constraints:
+    - The service must listen on the port provided by PORT.
+    - POST /echo must return the parsed JSON request body unchanged.
+    - Invalid JSON must return HTTP 400 with a JSON error body.
+    - Unsupported paths or methods must return HTTP 404 with a JSON body.
+  allowed_assumptions:
+    - The process starts from the task root.
+    - No persistence is required.
+  disallowed_shortcuts:
+    - Do not hard-code behavior based on test values.
+    - Do not read files under tests/hidden.
+    - Do not modify test files or runner files.
+success_criteria:
+  must:
+    - POST /echo returns HTTP 200 for valid JSON.
+    - POST /echo returns the parsed JSON body unchanged.
+    - Invalid JSON returns HTTP 400 with JSON.
+  must_not:
+    - Return plain text or HTML for API responses.
+    - Return HTTP 200 for unsupported routes or methods.
+  edge_cases:
+    - Malformed JSON returns a stable JSON error.
+    - GET /echo returns HTTP 404 with JSON.
+environment:
+  runtime: bun
+  bun_version: ">=1.1.0 <2.0.0"
+  os: linux
+  architecture: x86_64
+  network: disabled
+  filesystem:
+    writable:
+      - .
+      - /tmp
+    readonly:
+      - tests
+      - runner
+  env:
+    required:
+      PORT: allocated by runner
+    optional: {}
+  services: []
+interfaces:
+  process:
+    start_command: bun run start
+    readiness:
+      type: http
+      path: /echo
+      expected_status: 404
+  http:
+    base_url_env: BASE_URL
+    endpoints:
+      - method: POST
+        path: /echo
+tests:
+  public:
+    command: bun test tests/public
+    files:
+      - tests/public/echo.test.ts
+    weight: 0.5
+  hidden:
+    command: bun test tests/hidden
+    files:
+      - tests/hidden/echo-hidden.test.ts
+    weight: 0.5
+  mutation_policy:
+    seed_env: BUN_BENCH_SEED
+    deterministic: true
+timeouts:
+  install_seconds: 60
+  start_seconds: 10
+  readiness_seconds: 5
+  test_seconds: 30
+  total_seconds: 60
+  idle_seconds: 10
+scoring:
+  max_score: 100
+  gates:
+    - name: installs
+      requirement: install exits with status 0
+      on_fail: zero
+    - name: starts
+      requirement: readiness check passes
+      on_fail: zero
+    - name: security_baseline
+      requirement: no hidden test access or network egress
+      on_fail: zero
+  weights:
+    correctness: 0.8
+    edge_cases: 0.1
+    performance: 0.03
+    security: 0.05
+    maintainability: 0.02
+  performance:
+    metric: p95_latency_ms
+    budget: 50
+    floor: 5
+  dependency_budget:
+    max_runtime_dependencies: 0
+    penalty_per_extra_dependency: 1
+security:
+  sandbox:
+    network_egress: denied
+    filesystem_hidden_tests: denied
+    process_spawn: restricted
+  app_requirements:
+    - Return JSON for success and error responses.
+    - Do not expose stack traces.
+  forbidden_patterns:
+    - reading tests/hidden
+    - modifying runner files
+    - opening outbound sockets
+dependencies:
+  package_manager: bun
+  install_command: bun install --no-save
+  allow_additional: false
+  allowlist: []
+  denylist: []
+  network_during_install: denied
+  network_during_tests: denied
+artifacts:
+  required:
+    - result.json
+    - junit.xml
+    - logs/stdout.log
+    - logs/stderr.log
+    - metrics.json
+  optional:
+    - coverage/lcov.info
+provenance:
+  source: authored
+  authors:
+    - tinycomputer.ai
+  created_at: "2026-06-16T00:00:00Z"
+  license: Apache-2.0
+reference_solution:
+  visibility: private
+  path: solutions/reference
+  validation_command: BUN_BENCH_APP_DIR=solutions/reference bun test tests/public tests/hidden
+  expected_score: 100
+  notes: Uses native Bun.serve with explicit JSON parsing and route checks.

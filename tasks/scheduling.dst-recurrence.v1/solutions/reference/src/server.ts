@@ -1,0 +1,190 @@
+import { randomUUID } from "node:crypto";
+
+const port = Number(Bun.env.PORT ?? 3000);
+
+type Schedule = {
+  id: string;
+  tz: string;
+  hour: number;
+  minute: number;
+  frequency: "daily";
+  on_overlap: "earlier" | "later";
+};
+
+const schedules = new Map<string, Schedule>();
+
+type LocalParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+};
+
+function getLocalParts(tz: string, utcMs: number): LocalParts {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+    hourCycle: "h23",
+  });
+  const parts = fmt.formatToParts(new Date(utcMs));
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    if (part.type !== "literal") {
+      map[part.type] = part.value;
+    }
+  }
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    hour: Number(map.hour),
+    minute: Number(map.minute),
+  };
+}
+
+function localKey(parts: Pick<LocalParts, "year" | "month" | "day">): string {
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function utcIso(ms: number): string {
+  return new Date(ms).toISOString().replace(".000Z", "Z");
+}
+
+function zonedLocalToUtc(
+  tz: string,
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  overlap: "earlier" | "later",
+): number | "gap" {
+  const roughStart = Date.UTC(year, month - 1, day - 1, 0, 0, 0);
+  const roughEnd = Date.UTC(year, month - 1, day + 1, 23, 59, 59);
+  const matches: number[] = [];
+
+  for (let utc = roughStart; utc <= roughEnd; utc += 60_000) {
+    const parts = getLocalParts(tz, utc);
+    if (
+      parts.year === year &&
+      parts.month === month &&
+      parts.day === day &&
+      parts.hour === hour &&
+      parts.minute === minute
+    ) {
+      matches.push(utc);
+    }
+  }
+
+  if (matches.length === 0) return "gap";
+  if (matches.length === 1) return matches[0]!;
+  return overlap === "earlier" ? matches[0]! : matches[matches.length - 1]!;
+}
+
+function parseInstant(raw: string): number | null {
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function expandDaily(schedule: Schedule, fromMs: number, toMs: number): string[] {
+  if (toMs < fromMs) return [];
+
+  const seenDays = new Set<string>();
+  const out: string[] = [];
+  const scanStart = fromMs - 86_400_000;
+  const scanEnd = toMs + 86_400_000;
+
+  for (let utc = scanStart; utc <= scanEnd; utc += 3_600_000) {
+    const local = getLocalParts(schedule.tz, utc);
+    const key = localKey(local);
+    if (seenDays.has(key)) continue;
+    seenDays.add(key);
+
+    const instant = zonedLocalToUtc(
+      schedule.tz,
+      local.year,
+      local.month,
+      local.day,
+      schedule.hour,
+      schedule.minute,
+      schedule.on_overlap,
+    );
+    if (instant === "gap") continue;
+    if (instant >= fromMs && instant <= toMs) {
+      out.push(utcIso(instant));
+    }
+  }
+
+  return out.sort();
+}
+
+Bun.serve({
+  port,
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/healthz") {
+      return Response.json({ ok: true }, { status: 200 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/schedules") {
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return Response.json({ error: "invalid_body" }, { status: 422 });
+      }
+      const record = body as Record<string, unknown> | null;
+      if (
+        !record ||
+        typeof record.tz !== "string" ||
+        !Number.isInteger(record.hour) ||
+        !Number.isInteger(record.minute) ||
+        record.frequency !== "daily"
+      ) {
+        return Response.json({ error: "invalid_body" }, { status: 422 });
+      }
+      const schedule: Schedule = {
+        id: typeof record.id === "string" ? record.id : randomUUID(),
+        tz: record.tz,
+        hour: record.hour as number,
+        minute: record.minute as number,
+        frequency: "daily",
+        on_overlap: "earlier",
+      };
+      schedules.set(schedule.id, schedule);
+      return Response.json(schedule, { status: 201 });
+    }
+
+    const occMatch = /^\/schedules\/([^/]+)\/occurrences$/.exec(url.pathname);
+    if (request.method === "GET" && occMatch) {
+      const id = decodeURIComponent(occMatch[1]!);
+      const schedule = schedules.get(id);
+      if (!schedule) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
+      const fromRaw = url.searchParams.get("from");
+      const toRaw = url.searchParams.get("to");
+      if (!fromRaw || !toRaw) {
+        return Response.json({ error: "invalid_range" }, { status: 400 });
+      }
+      const fromMs = parseInstant(fromRaw);
+      const toMs = parseInstant(toRaw);
+      if (fromMs === null || toMs === null) {
+        return Response.json({ error: "invalid_range" }, { status: 400 });
+      }
+      const occurrences = expandDaily(schedule, fromMs, toMs);
+      return Response.json({ schedule_id: id, occurrences }, { status: 200 });
+    }
+
+    return Response.json({ error: "not_found" }, { status: 404 });
+  },
+});
+
+console.log(`dst-recurrence reference listening on ${port}`);

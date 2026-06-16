@@ -1,0 +1,138 @@
+import { createHash, randomUUID } from "node:crypto";
+
+const port = Number(Bun.env.PORT ?? 3000);
+
+type Upload = {
+  id: string;
+  total_size: number;
+  chunk_size: number;
+  chunks: Map<number, Buffer>;
+  complete: boolean;
+};
+
+const uploads = new Map<string, Upload>();
+const uploadLocks = new Map<string, Promise<void>>();
+
+async function withUploadLock<T>(id: string, fn: () => T | Promise<T>): Promise<T> {
+  const prev = uploadLocks.get(id) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  uploadLocks.set(id, prev.then(() => gate));
+  await prev;
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
+function receivedRanges(upload: Upload): Array<{ start: number; end: number }> {
+  const ranges: Array<{ start: number; end: number }> = [];
+  for (const [offset, buf] of upload.chunks) {
+    ranges.push({ start: offset, end: offset + buf.length });
+  }
+  ranges.sort((a, b) => a.start - b.start);
+  return ranges;
+}
+
+function allRangesPresent(upload: Upload): boolean {
+  let covered = 0;
+  for (const [, buf] of upload.chunks) covered += buf.length;
+  return covered === upload.total_size;
+}
+
+Bun.serve({
+  port,
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/healthz") {
+      return Response.json({ ok: true }, { status: 200 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/uploads") {
+      const body = await request.json().catch(() => null);
+      const record = body as Record<string, unknown> | null;
+      if (!record || !Number.isInteger(record.total_size) || (record.total_size as number) <= 0) {
+        return Response.json({ error: "invalid_body" }, { status: 422 });
+      }
+      const chunk_size = Number.isInteger(record.chunk_size) ? (record.chunk_size as number) : 1024;
+      const id = randomUUID();
+      uploads.set(id, {
+        id,
+        total_size: record.total_size as number,
+        chunk_size,
+        chunks: new Map(),
+        complete: false,
+      });
+      return Response.json({ upload_id: id, chunk_size, total_size: record.total_size }, { status: 201 });
+    }
+
+    const uploadMatch = /^\/uploads\/([^/]+)(?:\/(chunks|complete))?$/.exec(url.pathname);
+    if (!uploadMatch) return Response.json({ error: "not_found" }, { status: 404 });
+    const uploadId = decodeURIComponent(uploadMatch[1]!);
+    const upload = uploads.get(uploadId);
+    if (!upload) return Response.json({ error: "not_found" }, { status: 404 });
+
+    if (request.method === "GET" && uploadMatch && uploadMatch[2] !== "chunks" && uploadMatch[2] !== "complete") {
+      return Response.json(
+        {
+          upload_id: upload.id,
+          total_size: upload.total_size,
+          chunk_size: upload.chunk_size,
+          complete: upload.complete,
+          received: receivedRanges(upload),
+        },
+        { status: 200 },
+      );
+    }
+
+    if (request.method === "PUT" && uploadMatch[2] === "chunks") {
+      const offsetRaw = url.searchParams.get("offset");
+      if (offsetRaw === null || !/^-?\d+$/.test(offsetRaw)) {
+        return Response.json({ error: "invalid_offset" }, { status: 400 });
+      }
+      const offset = Number(offsetRaw);
+      if (offset < 0 || offset >= upload.total_size) {
+        return Response.json({ error: "invalid_offset" }, { status: 400 });
+      }
+      const data = Buffer.from(await request.arrayBuffer());
+      if (data.length === 0) return Response.json({ error: "empty_chunk" }, { status: 400 });
+      if (offset + data.length > upload.total_size) {
+        return Response.json({ error: "chunk_overflow" }, { status: 400 });
+      }
+
+      return withUploadLock(uploadId, () => {
+        upload.chunks.set(offset, data);
+        return Response.json({ ok: true, offset, size: data.length }, { status: 200 });
+      });
+    }
+
+    if (request.method === "POST" && uploadMatch[2] === "complete") {
+      const body = await request.json().catch(() => null);
+      const record = body as Record<string, unknown> | null;
+      if (!record || typeof record.sha256 !== "string") {
+        return Response.json({ error: "invalid_body" }, { status: 422 });
+      }
+      if (!allRangesPresent(upload)) {
+        return Response.json({ error: "incomplete", missing: receivedRanges(upload) }, { status: 409 });
+      }
+      const assembled = Buffer.alloc(upload.total_size);
+      for (const [offset, buf] of upload.chunks) {
+        buf.copy(assembled, offset);
+      }
+      const hash = createHash("sha256").update(assembled).digest("hex");
+      if (hash !== record.sha256) {
+        return Response.json({ error: "checksum_mismatch" }, { status: 422 });
+      }
+      upload.complete = true;
+      return Response.json({ upload_id: upload.id, complete: true, sha256: hash }, { status: 200 });
+    }
+
+    return Response.json({ error: "not_found" }, { status: 404 });
+  },
+});
+
+console.log(`resumable-chunks reference listening on ${port}`);

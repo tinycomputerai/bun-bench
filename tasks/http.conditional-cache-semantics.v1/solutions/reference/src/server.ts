@@ -1,0 +1,247 @@
+import { createHash } from "node:crypto";
+
+const port = Number(Bun.env.PORT ?? 3000);
+
+type Variant = {
+  body: string;
+  etag: string;
+  lastModified: string;
+};
+
+type Document = {
+  updatedAt: number;
+  variants: Map<string, Variant>;
+};
+
+let document: Document = createDocument("hello");
+
+function hashBody(body: string): string {
+  return createHash("sha256").update(body).digest("hex").slice(0, 16);
+}
+
+function httpDate(ms: number): string {
+  return new Date(ms).toUTCString();
+}
+
+function createDocument(body: string): Document {
+  const updatedAt = Date.now();
+  const etag = `"${hashBody(body)}"`;
+  const variant: Variant = { body, etag, lastModified: httpDate(updatedAt) };
+  const gzipBody = `gzip:${body}`;
+  const gzipVariant: Variant = {
+    body: gzipBody,
+    etag: `"${hashBody(gzipBody)}"`,
+    lastModified: httpDate(updatedAt),
+  };
+  return {
+    updatedAt,
+    variants: new Map([
+      ["identity", variant],
+      ["gzip", gzipVariant],
+    ]),
+  };
+}
+
+function pickEncoding(request: Request): "identity" | "gzip" {
+  const accept = request.headers.get("accept-encoding") ?? "";
+  if (/\bgzip\b/.test(accept)) return "gzip";
+  return "identity";
+}
+
+function parseEtags(header: string | null): string[] {
+  if (!header) return [];
+  return header.split(",").map((part) => part.trim()).filter(Boolean);
+}
+
+function etagMatches(ifNoneMatch: string, etag: string): boolean {
+  if (ifNoneMatch.trim() === "*") return true;
+  const candidates = parseEtags(ifNoneMatch);
+  const weakTarget = etag.startsWith("W/") ? etag : `W/${etag}`;
+  return candidates.some((candidate) => {
+    if (candidate === "*") return true;
+    if (candidate === etag) return true;
+    const normalized = candidate.startsWith("W/") ? candidate : `W/${candidate}`;
+    return normalized === weakTarget;
+  });
+}
+
+function strongEtagMatches(ifMatch: string, etag: string): boolean {
+  const strong = etag.startsWith("W/") ? etag.slice(2) : etag;
+  return parseEtags(ifMatch).some((candidate) => {
+    if (candidate.startsWith("W/")) return false;
+    return candidate === strong;
+  });
+}
+
+function parseHttpDate(value: string | null): number | null {
+  if (!value) return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+type CacheEntry = {
+  body: string;
+  etag: string;
+  lastModified: string;
+  cacheControl: string;
+  encoding: string;
+  storedAt: number;
+  maxAgeMs: number;
+};
+
+const cacheStore = new Map<string, CacheEntry>();
+
+function cacheKey(encoding: string): string {
+  return `resource|ae:${encoding}`;
+}
+
+function originGet(request: Request): Response {
+  const encoding = pickEncoding(request);
+  const variant = document.variants.get(encoding)!;
+  const ifNoneMatch = request.headers.get("if-none-match");
+  const ifModifiedSince = request.headers.get("if-modified-since");
+
+  if (ifNoneMatch && etagMatches(ifNoneMatch, variant.etag)) {
+    return new Response(null, {
+      status: 304,
+      headers: {
+        ETag: variant.etag,
+        "Last-Modified": variant.lastModified,
+        "Cache-Control": "public, max-age=60",
+        Vary: "Accept-Encoding",
+      },
+    });
+  }
+
+  if (!ifNoneMatch && ifModifiedSince) {
+    const since = parseHttpDate(ifModifiedSince);
+    if (since !== null) {
+      const resourceSec = Math.floor(document.updatedAt / 1000);
+      const sinceSec = Math.floor(since / 1000);
+      if (resourceSec <= sinceSec) {
+        return new Response(null, {
+          status: 304,
+          headers: {
+            ETag: variant.etag,
+            "Last-Modified": variant.lastModified,
+            "Cache-Control": "public, max-age=60",
+            Vary: "Accept-Encoding",
+          },
+        });
+      }
+    }
+  }
+
+  return new Response(variant.body, {
+    status: 200,
+    headers: {
+      ETag: variant.etag,
+      "Last-Modified": variant.lastModified,
+      "Cache-Control": "public, max-age=60",
+      Vary: "Accept-Encoding",
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+  });
+}
+
+async function cachedGet(request: Request): Promise<Response> {
+  const encoding = pickEncoding(request);
+  const key = cacheKey(encoding);
+  const ifNoneMatch = request.headers.get("if-none-match");
+  const now = Date.now();
+
+  let entry = cacheStore.get(key);
+  if (!entry || now - entry.storedAt > entry.maxAgeMs) {
+    const originReq = new Request("http://local/resource", {
+      headers: { "Accept-Encoding": encoding === "gzip" ? "gzip" : "identity" },
+    });
+    const origin = originGet(originReq);
+    if (origin.status !== 200) {
+      return origin;
+    }
+    entry = {
+      body: await awaitText(origin),
+      etag: origin.headers.get("etag") ?? "",
+      lastModified: origin.headers.get("last-modified") ?? "",
+      cacheControl: origin.headers.get("cache-control") ?? "public, max-age=60",
+      encoding,
+      storedAt: now,
+      maxAgeMs: 60_000,
+    };
+    cacheStore.set(key, entry);
+  }
+
+  if (ifNoneMatch && etagMatches(ifNoneMatch, entry.etag)) {
+    return new Response(null, {
+      status: 304,
+      headers: {
+        ETag: entry.etag,
+        "Last-Modified": entry.lastModified,
+        "Cache-Control": entry.cacheControl,
+        Vary: "Accept-Encoding",
+        "X-Cache": "HIT",
+      },
+    });
+  }
+
+  return new Response(entry.body, {
+    status: 200,
+    headers: {
+      ETag: entry.etag,
+      "Last-Modified": entry.lastModified,
+      "Cache-Control": entry.cacheControl,
+      Vary: "Accept-Encoding",
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Cache": "HIT",
+    },
+  });
+}
+
+async function awaitText(response: Response): Promise<string> {
+  return response.text();
+}
+
+Bun.serve({
+  port,
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/healthz") {
+      return Response.json({ ok: true }, { status: 200 });
+    }
+
+    if (request.method === "GET" && url.pathname === "/resource") {
+      return originGet(request);
+    }
+
+    if (request.method === "GET" && url.pathname === "/cached/resource") {
+      return cachedGet(request);
+    }
+
+    if (request.method === "PUT" && url.pathname === "/resource") {
+      const ifMatch = request.headers.get("if-match");
+      const variant = document.variants.get("identity")!;
+      if (!ifMatch || !strongEtagMatches(ifMatch, variant.etag)) {
+        return Response.json({ error: "precondition_failed" }, { status: 412 });
+      }
+      const body = await request.text();
+      document = createDocument(body);
+      cacheStore.clear();
+      const updated = document.variants.get("identity")!;
+      return new Response(updated.body, {
+        status: 200,
+        headers: {
+          ETag: updated.etag,
+          "Last-Modified": updated.lastModified,
+          "Cache-Control": "no-cache",
+          Vary: "Accept-Encoding",
+          "Content-Type": "text/plain; charset=utf-8",
+        },
+      });
+    }
+
+    return Response.json({ error: "not_found" }, { status: 404 });
+  },
+});
+
+console.log(`conditional-cache reference listening on ${port}`);

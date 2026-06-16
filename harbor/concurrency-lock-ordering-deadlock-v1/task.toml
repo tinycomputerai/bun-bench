@@ -1,0 +1,36 @@
+schema_version = "1.3"
+artifacts = []
+
+[task]
+name = "bun-bench/concurrency-lock-ordering-deadlock-v1"
+description = "Deadlock-free account transfers. Concurrent opposite-direction transfers do not deadlock. Disjoint transfers make progress concurrently. Total balance is conserved."
+keywords = ["bun-bench", "id:concurrency.lock-ordering-deadlock.v1", "task_version:1.0.0", "spec_version:0.1.0", "category:databases", "difficulty:5"]
+[[task.authors]]
+name = "tincomputer.ai"
+
+[metadata]
+author_name = "tincomputer.ai"
+author_email = "unknown"
+difficulty = "hard"
+category = "software_engineering"
+tags = ["databases", "bun", "deadlock", "locking", "transfers"]
+expert_time_estimate_min = 0.0
+junior_time_estimate_min = 0.0
+
+[verifier]
+timeout_sec = 420.0
+
+[verifier.env]
+
+[agent]
+timeout_sec = 900.0
+
+[environment]
+network_mode = "no-network"
+build_timeout_sec = 600.0
+os = "linux"
+mcp_servers = []
+
+[environment.env]
+
+[solution.env]

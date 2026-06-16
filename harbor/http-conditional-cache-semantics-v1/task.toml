@@ -1,0 +1,36 @@
+schema_version = "1.3"
+artifacts = []
+
+[task]
+name = "bun-bench/http-conditional-cache-semantics-v1"
+description = "Build a Bun HTTP origin with strong ETags, conditional GET 304 handling, strong If-Match on PUT, and a Vary-aware intermediary cache keyed on Accept-Encoding."
+keywords = ["bun-bench", "id:http.conditional-cache-semantics.v1", "task_version:1.0.0", "spec_version:0.1.0", "category:http-apis", "difficulty:4"]
+[[task.authors]]
+name = "tincomputer.ai"
+
+[metadata]
+author_name = "tincomputer.ai"
+author_email = "unknown"
+difficulty = "hard"
+category = "software_engineering"
+tags = ["http-apis", "bun", "caching", "etag", "vary"]
+expert_time_estimate_min = 0.0
+junior_time_estimate_min = 0.0
+
+[verifier]
+timeout_sec = 300.0
+
+[verifier.env]
+
+[agent]
+timeout_sec = 900.0
+
+[environment]
+network_mode = "no-network"
+build_timeout_sec = 600.0
+os = "linux"
+mcp_servers = []
+
+[environment.env]
+
+[solution.env]

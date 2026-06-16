@@ -1,0 +1,124 @@
+const port = Number(Bun.env.PORT ?? 3000);
+const MAX_QUEUE = 8;
+
+type SocketData = { topic: string };
+type Outbound = { seq: number; data: unknown; gap?: { from: number; to: number } };
+
+type ClientState = {
+  ws: Bun.ServerWebSocket<SocketData>;
+  queue: Outbound[];
+  draining: boolean;
+  lastSent: number;
+};
+
+const topicSeq = new Map<string, number>();
+const subscribers = new Map<string, Set<ClientState>>();
+
+function nextSeq(topic: string): number {
+  const next = (topicSeq.get(topic) ?? 0) + 1;
+  topicSeq.set(topic, next);
+  return next;
+}
+
+function enqueue(client: ClientState, msg: Outbound): void {
+  client.queue.push(msg);
+  while (client.queue.length > MAX_QUEUE) {
+    const dropped = client.queue.shift()!;
+    if (!dropped.gap) {
+      const next = client.queue[0];
+      const from = dropped.seq;
+      const to = next ? next.seq - 1 : dropped.seq;
+      client.queue.unshift({ seq: from, data: null, gap: { from, to } });
+      break;
+    }
+  }
+  void drain(client);
+}
+
+async function drain(client: ClientState): Promise<void> {
+  if (client.draining) return;
+  client.draining = true;
+  while (client.queue.length > 0 && client.ws.readyState === WebSocket.OPEN) {
+    const msg = client.queue[0]!;
+    const payload = msg.gap
+      ? JSON.stringify({ type: "gap", from_seq: msg.gap.from, to_seq: msg.gap.to })
+      : JSON.stringify({ seq: msg.seq, data: msg.data });
+    try {
+      client.ws.send(payload);
+      client.queue.shift();
+      if (!msg.gap) client.lastSent = msg.seq;
+    } catch {
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  client.draining = false;
+}
+
+function publishTopic(topic: string, data: unknown): number {
+  const seq = nextSeq(topic);
+  const msg: Outbound = { seq, data };
+  const subs = subscribers.get(topic);
+  if (!subs) return seq;
+  for (const client of subs) enqueue(client, { ...msg });
+  return seq;
+}
+
+const server = Bun.serve<SocketData>({
+  port,
+  async fetch(request, srv) {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/healthz") {
+      return Response.json({ ok: true }, { status: 200 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/publish") {
+      const body = await request.json().catch(() => null);
+      const record = body as Record<string, unknown> | null;
+      if (!record || typeof record.topic !== "string" || !("data" in record)) {
+        return Response.json({ error: "invalid_body" }, { status: 422 });
+      }
+      const seq = publishTopic(record.topic, record.data);
+      return Response.json({ topic: record.topic, seq }, { status: 201 });
+    }
+
+    if (url.pathname === "/ws") {
+      const topic = url.searchParams.get("topic");
+      if (!topic) return Response.json({ error: "topic_required" }, { status: 400 });
+      const ok = srv.upgrade(request, { data: { topic } });
+      if (ok) return undefined;
+      return Response.json({ error: "upgrade_failed" }, { status: 426 });
+    }
+
+    return Response.json({ error: "not_found" }, { status: 404 });
+  },
+  websocket: {
+    open(ws) {
+      const { topic } = ws.data;
+      const state: ClientState = { ws, queue: [], draining: false, lastSent: 0 };
+      let set = subscribers.get(topic);
+      if (!set) {
+        set = new Set();
+        subscribers.set(topic, set);
+      }
+      set.add(state);
+    },
+    close(ws) {
+      const { topic } = ws.data;
+      const set = subscribers.get(topic);
+      if (!set) return;
+      for (const client of set) {
+        if (client.ws === ws) {
+          set.delete(client);
+          client.queue.length = 0;
+          break;
+        }
+      }
+      if (set.size === 0) subscribers.delete(topic);
+    },
+    message() {},
+  },
+});
+
+console.log(`backpressure-ordering reference listening on ${server.port}`);

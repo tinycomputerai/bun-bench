@@ -1,0 +1,87 @@
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+
+const port = Number(Bun.env.PORT ?? 3000);
+const SIGNING_SECRET = "signed-url-secret";
+const SKEW_SECONDS = 30;
+
+const usedNonces = new Set<string>();
+
+function canonicalQuery(params: URLSearchParams): string {
+  const entries = [...params.entries()]
+    .filter(([k]) => !["sig", "exp", "nonce"].includes(k))
+    .sort(([a], [b]) => a.localeCompare(b));
+  return entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+}
+
+function signingPayload(method: string, path: string, query: string, exp: number, nonce: string): string {
+  return `${method.toUpperCase()}\n${path}\n${query}\n${exp}\n${nonce}`;
+}
+
+function sign(method: string, path: string, query: string, exp: number, nonce: string): string {
+  return createHmac("sha256", SIGNING_SECRET).update(signingPayload(method, path, query, exp, nonce)).digest("hex");
+}
+
+function verifyRequest(request: Request): boolean {
+  const url = new URL(request.url);
+  const sig = url.searchParams.get("sig");
+  const expRaw = url.searchParams.get("exp");
+  const nonce = url.searchParams.get("nonce");
+  if (!sig || !expRaw || !nonce) return false;
+  const exp = Number(expRaw);
+  if (!Number.isInteger(exp)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  if (exp < now - SKEW_SECONDS || exp > now + SKEW_SECONDS + 3600) return false;
+  if (usedNonces.has(nonce)) return false;
+
+  const query = canonicalQuery(url.searchParams);
+  const expected = sign(request.method, url.pathname, query, exp, nonce);
+  const a = Buffer.from(sig, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
+
+  usedNonces.add(nonce);
+  return true;
+}
+
+Bun.serve({
+  port,
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/healthz") {
+      return Response.json({ ok: true }, { status: 200 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/sign") {
+      const body = await request.json().catch(() => null);
+      const record = body as Record<string, unknown> | null;
+      if (!record || typeof record.method !== "string" || typeof record.path !== "string") {
+        return Response.json({ error: "invalid_body" }, { status: 422 });
+      }
+      const ttl = Number.isInteger(record.ttl) ? (record.ttl as number) : 300;
+      const exp = Math.floor(Date.now() / 1000) + ttl;
+      const nonce = randomBytes(16).toString("hex");
+      const queryObj = (record.query ?? {}) as Record<string, string>;
+      const params = new URLSearchParams(queryObj);
+      const query = canonicalQuery(params);
+      const sig = sign(record.method, record.path, query, exp, nonce);
+      const signed = new URL(`http://local${record.path}`);
+      for (const [k, v] of Object.entries(queryObj)) signed.searchParams.set(k, v);
+      signed.searchParams.set("exp", String(exp));
+      signed.searchParams.set("nonce", nonce);
+      signed.searchParams.set("sig", sig);
+      return Response.json({ url: `${signed.pathname}${signed.search}`, exp, nonce }, { status: 200 });
+    }
+
+    if (url.searchParams.has("sig")) {
+      if (!verifyRequest(request)) {
+        return Response.json({ error: "forbidden" }, { status: 403 });
+      }
+      return Response.json({ ok: true, path: url.pathname }, { status: 200 });
+    }
+
+    return Response.json({ error: "not_found" }, { status: 404 });
+  },
+});
+
+console.log(`signed-url-replay reference listening on ${port}`);

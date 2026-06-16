@@ -1,0 +1,139 @@
+const port = Number(Bun.env.PORT ?? 3000);
+
+type RunRecord = {
+  job: string;
+  scheduled_time: number;
+  status: "running" | "completed" | "skipped";
+  started_at?: number;
+  completed_at?: number;
+};
+
+type JobConfig = {
+  name: string;
+  interval_ms: number;
+  missed_policy: "catch_up" | "skip";
+  registered_at: number;
+  running: boolean;
+};
+
+const jobs = new Map<string, JobConfig>();
+const completedSlots = new Map<string, Set<number>>();
+const runs: RunRecord[] = [];
+
+function slotFor(time: number, interval: number): number {
+  return Math.floor(time / interval) * interval;
+}
+
+function markCompleted(job: string, slot: number): void {
+  let set = completedSlots.get(job);
+  if (!set) {
+    set = new Set();
+    completedSlots.set(job, set);
+  }
+  set.add(slot);
+}
+
+function isCompleted(job: string, slot: number): boolean {
+  return completedSlots.get(job)?.has(slot) ?? false;
+}
+
+function lastCompletedSlot(job: string): number | null {
+  const set = completedSlots.get(job);
+  if (!set || set.size === 0) return null;
+  return Math.max(...set);
+}
+
+function pendingSlots(config: JobConfig, now: number): number[] {
+  const current = slotFor(now, config.interval_ms);
+  const start = slotFor(config.registered_at, config.interval_ms);
+  const last = lastCompletedSlot(config.name);
+  let cursor = last === null ? start : last + config.interval_ms;
+  const slots: number[] = [];
+  while (cursor <= current) {
+    if (!isCompleted(config.name, cursor)) slots.push(cursor);
+    cursor += config.interval_ms;
+  }
+  if (config.missed_policy === "skip" && slots.length > 0) {
+    return [slots.at(-1)!];
+  }
+  return slots;
+}
+
+async function executeRun(jobName: string, slot: number, config: JobConfig): Promise<void> {
+  if (isCompleted(jobName, slot)) return;
+  if (config.running) {
+    if (config.missed_policy === "skip") {
+      runs.push({ job: jobName, scheduled_time: slot, status: "skipped" });
+    }
+    return;
+  }
+  config.running = true;
+  const record: RunRecord = { job: jobName, scheduled_time: slot, status: "running", started_at: Date.now() };
+  runs.push(record);
+  await new Promise((r) => setTimeout(r, 80));
+  record.status = "completed";
+  record.completed_at = Date.now();
+  markCompleted(jobName, slot);
+  config.running = false;
+}
+
+async function tick(): Promise<void> {
+  const now = Date.now();
+  for (const [name, config] of jobs) {
+    for (const slot of pendingSlots(config, now)) {
+      if (!isCompleted(name, slot)) {
+        void executeRun(name, slot, config);
+      }
+    }
+  }
+}
+
+setInterval(() => {
+  void tick();
+}, 50);
+
+Bun.serve({
+  port,
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/healthz") {
+      return Response.json({ ok: true }, { status: 200 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/jobs") {
+      const body = await request.json().catch(() => null);
+      const record = body as Record<string, unknown> | null;
+      if (!record || typeof record.name !== "string" || !Number.isInteger(record.interval_ms)) {
+        return Response.json({ error: "invalid_body" }, { status: 422 });
+      }
+      const policy = record.missed_policy === "catch_up" ? "catch_up" : "skip";
+      jobs.set(record.name, {
+        name: record.name,
+        interval_ms: record.interval_ms as number,
+        missed_policy: policy,
+        registered_at: Date.now(),
+        running: false,
+      });
+      completedSlots.set(record.name, new Set());
+      return Response.json({ name: record.name, interval_ms: record.interval_ms, missed_policy: policy }, { status: 201 });
+    }
+
+    if (request.method === "GET" && url.pathname === "/runs") {
+      const job = url.searchParams.get("job");
+      const filtered = job ? runs.filter((r) => r.job === job) : runs;
+      return Response.json({ runs: filtered }, { status: 200 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/admin/restart") {
+      for (const config of jobs.values()) {
+        config.running = false;
+      }
+      return Response.json({ restarted: true }, { status: 200 });
+    }
+
+    return Response.json({ error: "not_found" }, { status: 404 });
+  },
+});
+
+console.log(`cron-exactly-once reference listening on ${port}`);

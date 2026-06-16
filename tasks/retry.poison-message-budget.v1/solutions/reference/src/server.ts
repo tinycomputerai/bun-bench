@@ -1,0 +1,146 @@
+const port = Number(Bun.env.PORT ?? 3000);
+
+const MAX_ATTEMPTS = 4;
+const BASE_BACKOFF_MS = 25;
+
+type JobState = {
+  id: string;
+  payload: string;
+  state: "queued" | "processing" | "completed" | "dead_letter";
+  attempts: number;
+  last_error?: string;
+  side_effects: number;
+};
+
+const jobs = new Map<string, JobState>();
+const inFlight = new Map<string, Promise<void>>();
+const attemptCounts = new Map<string, number>();
+
+function classifyError(payload: string, attempt: number): "transient" | "permanent" | "success" {
+  if (payload === "ok" || payload.startsWith("ok:")) return "success";
+  if (payload.startsWith("permanent")) return "permanent";
+  if (payload.startsWith("transient:")) {
+    const limit = Number(payload.split(":")[1] ?? "1");
+    return attempt >= limit ? "success" : "transient";
+  }
+  if (payload === "poison") return "transient";
+  return "transient";
+}
+
+function backoffMs(attempt: number): number {
+  const jitter = Math.floor(Math.random() * 10);
+  return BASE_BACKOFF_MS * 2 ** Math.max(0, attempt - 1) + jitter;
+}
+
+async function runJob(id: string): Promise<void> {
+  const job = jobs.get(id);
+  if (!job || job.state === "completed" || job.state === "dead_letter") return;
+
+  job.state = "processing";
+  const attemptKey = `${id}:${job.attempts + 1}`;
+  const seen = attemptCounts.get(attemptKey) ?? 0;
+  attemptCounts.set(attemptKey, seen + 1);
+
+  const outcome = classifyError(job.payload, job.attempts + 1);
+  job.attempts += 1;
+
+  if (outcome === "success") {
+    if (job.side_effects === 0) job.side_effects = 1;
+    job.state = "completed";
+    delete job.last_error;
+    return;
+  }
+
+  if (outcome === "permanent") {
+    job.state = "dead_letter";
+    job.last_error = job.payload;
+    return;
+  }
+
+  job.last_error = "transient_failure";
+  if (job.attempts >= MAX_ATTEMPTS) {
+    job.state = "dead_letter";
+    job.last_error = "retry_budget_exhausted";
+    return;
+  }
+
+  job.state = "queued";
+  await new Promise((r) => setTimeout(r, backoffMs(job.attempts)));
+  await runJob(id);
+}
+
+async function enqueueProcess(id: string, payload: string): Promise<JobState> {
+  let existing = inFlight.get(id);
+  if (existing) {
+    await existing;
+    const job = jobs.get(id);
+    if (!job) throw new Error("missing job");
+    return job;
+  }
+
+  let job = jobs.get(id);
+  if (!job) {
+    job = { id, payload, state: "queued", attempts: 0, side_effects: 0 };
+    jobs.set(id, job);
+  } else if (job.state === "completed" || job.state === "dead_letter") {
+    return job;
+  } else {
+    job.payload = payload;
+  }
+
+  const work = (async () => {
+    await runJob(id);
+  })();
+  inFlight.set(id, work);
+  try {
+    await work;
+  } finally {
+    inFlight.delete(id);
+  }
+  return jobs.get(id)!;
+}
+
+Bun.serve({
+  port,
+  async fetch(request) {
+    const url = new URL(request.url);
+
+    if (request.method === "GET" && url.pathname === "/healthz") {
+      return Response.json({ ok: true }, { status: 200 });
+    }
+
+    if (request.method === "POST" && url.pathname === "/process") {
+      const body = await request.json().catch(() => null);
+      const record = body as Record<string, unknown> | null;
+      if (!record || typeof record.id !== "string" || typeof record.payload !== "string") {
+        return Response.json({ error: "invalid_body" }, { status: 422 });
+      }
+      const job = await enqueueProcess(record.id, record.payload);
+      return Response.json(
+        { id: job.id, state: job.state, attempts: job.attempts, side_effects: job.side_effects },
+        { status: job.state === "completed" ? 200 : 202 },
+      );
+    }
+
+    const statusMatch = /^\/status\/([^/]+)$/.exec(url.pathname);
+    if (request.method === "GET" && statusMatch) {
+      const id = decodeURIComponent(statusMatch[1]!);
+      const job = jobs.get(id);
+      if (!job) return Response.json({ error: "not_found" }, { status: 404 });
+      return Response.json(
+        {
+          id: job.id,
+          state: job.state,
+          attempts: job.attempts,
+          last_error: job.last_error ?? null,
+          side_effects: job.side_effects,
+        },
+        { status: 200 },
+      );
+    }
+
+    return Response.json({ error: "not_found" }, { status: 404 });
+  },
+});
+
+console.log(`poison-message reference listening on ${port}`);

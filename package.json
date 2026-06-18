@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "devDependencies": {
+    "@release-it/conventional-changelog": "^11.0.1",
     "@types/bun": "latest",
+    "release-it": "^20.2.0",
     "typescript": "^5.9.3"
   },
   "scripts": {
@@ -17,6 +19,15 @@
     "export:sft": "bun runners/export/export-sft.ts",
     "export:patches": "bun runners/export/export-patches.ts",
     "harbor:export": "bun runners/harbor/export-task.ts",
-    "harbor:export-suite": "bun runners/harbor/export-suite.ts"
+    "harbor:export-suite": "bun runners/harbor/export-suite.ts",
+    "release:stage": "bun scripts/release/stage-release-assets.ts",
+    "release:upload-staging": "bun scripts/release/upload-release-staging.ts",
+    "release:fetch-staging": "bun scripts/release/fetch-release-staging.ts",
+    "release:verify": "bun scripts/release/verify-release.ts",
+    "release:build": "bun scripts/release/build-release-artifacts.ts",
+    "release:github": "release-it --no-increment --ci",
+    "release:github:dry-run": "release-it --no-increment --ci --dry-run",
+    "release:harbor": "bun scripts/release/publish-harbor.ts",
+    "release:huggingface": "bun scripts/release/publish-huggingface.ts"
   }
 }

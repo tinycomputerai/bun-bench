@@ -3,4 +3,7 @@ runs/
 results/
 jobs/
 datasets/**/*.jsonl
+release-assets/
+.release-staging-fetch/
+dist/
 runners/export/.tmp-export-*

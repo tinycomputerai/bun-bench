@@ -133,8 +133,9 @@ task's `task.yaml` so downstream training pipelines can enforce split hygiene.
 
 3. Inspect the summary printed to stdout (`discovered`, `exported`, skip reasons).
 
-Generated JSONL files are gitignored. Commit task and runner changes; keep
-exported datasets local or publish them through your training pipeline.
+Generated JSONL files under `datasets/` and `release-assets/` are gitignored.
+Export locally, stage with `bun run release:stage`, and upload staging before
+tagging a release. See `docs/RELEASING.md`.
 
 ## Skip Reasons
 

@@ -1,0 +1,134 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing git tag to release (example: v0.1.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Validate and build only; do not publish"
+        required: true
+        type: boolean
+        default: true
+      publish_harbor:
+        description: "Publish Harbor Hub packages"
+        required: true
+        type: boolean
+        default: true
+      publish_huggingface:
+        description: "Publish Hugging Face dataset"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event.inputs.tag }}
+      DRY_RUN: ${{ github.event.inputs.dry_run }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Verify tag exists
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          git fetch --tags --force origin
+          if ! git rev-parse "refs/tags/${TAG}^{commit}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} does not exist on the remote repository."
+            exit 1
+          fi
+          echo "Found tag ${TAG}"
+
+      - name: Verify HEAD matches tag
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          TAG_SHA="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+          if [ "${HEAD_SHA}" != "${TAG_SHA}" ]; then
+            echo "HEAD (${HEAD_SHA}) does not match tag ${TAG} (${TAG_SHA})."
+            exit 1
+          fi
+          echo "HEAD matches tag ${TAG}"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Hugging Face CLI
+        run: python -m pip install --quiet huggingface_hub
+
+      - name: Fetch staged release assets
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: bun run release:fetch-staging -- --tag "${{ github.event.inputs.tag }}"
+
+      - name: Validate benchmark
+        run: bun run validate
+
+      - name: Run tests
+        run: bun test
+
+      - name: Verify release assets
+        run: bun run release:verify -- --tag "${{ github.event.inputs.tag }}" --datasets-only
+
+      - name: Build release artifacts
+        run: bun run release:build -- --tag "${{ github.event.inputs.tag }}"
+
+      - name: Verify release artifacts
+        run: bun run release:verify -- --tag "${{ github.event.inputs.tag }}"
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          if [ "${DRY_RUN}" = "true" ]; then
+            bun run release:github:dry-run -- "${VERSION}"
+          else
+            bun run release:github -- "${VERSION}"
+          fi
+
+      - name: Publish Harbor Hub packages
+        if: github.event.inputs.publish_harbor == 'true'
+        env:
+          HARBOR_TOKEN: ${{ secrets.HARBOR_TOKEN }}
+        run: |
+          if [ "${DRY_RUN}" = "true" ]; then
+            bun run release:harbor -- --tag "${{ github.event.inputs.tag }}" --dry-run
+          else
+            bun run release:harbor -- --tag "${{ github.event.inputs.tag }}"
+          fi
+
+      - name: Publish Hugging Face dataset
+        if: github.event.inputs.publish_huggingface == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ "${DRY_RUN}" = "true" ]; then
+            bun run release:huggingface -- --tag "${{ github.event.inputs.tag }}" --dry-run
+          else
+            bun run release:huggingface -- --tag "${{ github.event.inputs.tag }}"
+          fi

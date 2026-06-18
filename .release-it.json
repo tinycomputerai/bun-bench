@@ -1,0 +1,23 @@
+{
+  "git": {
+    "commit": false,
+    "tag": false,
+    "push": false,
+    "requireCleanWorkingDir": false,
+    "requireUpstream": false,
+    "tagName": "v${version}"
+  },
+  "npm": false,
+  "github": {
+    "release": true,
+    "update": true,
+    "assets": "dist/release/*"
+  },
+  "plugins": {
+    "@release-it/conventional-changelog": {
+      "preset": "conventionalcommits",
+      "infile": false,
+      "header": "# Changelog\n\n"
+    }
+  }
+}

@@ -1,7 +1,11 @@
 #!/usr/bin/env bun
 
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { discoverTasks } from "../suite/discover-tasks";
-import { exportTask } from "./export";
+import { pruneStaleHarborExports } from "./prune-stale";
+import { writeTasksLock } from "./tasks-lock";
+import { exportTask, sanitizeName } from "./export";
 
 const DEFAULT_OUT_ROOT = "harbor";
 
@@ -44,15 +48,26 @@ async function main(): Promise<void> {
 
   let exported = 0;
   let failed = 0;
+  const activeSlugs = new Set<string>();
   for (const taskPath of taskPaths) {
     try {
       const result = await exportTask(taskPath, outRoot);
+      activeSlugs.add(sanitizeName(result.id));
       exported += 1;
       console.log(`ok    ${result.id} -> ${result.outDir}`);
     } catch (error) {
       failed += 1;
       console.error(`FAIL  ${taskPath}: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  if (failed === 0) {
+    const removed = pruneStaleHarborExports(resolve(process.cwd(), outRoot), activeSlugs);
+    for (const slug of removed) {
+      console.log(`[harbor] removed stale export ${slug}`);
+    }
+    const lockPath = writeTasksLock(resolve(process.cwd(), outRoot));
+    console.log(`[harbor] wrote tasks lock to ${lockPath}`);
   }
 
   console.log(`\n[harbor] exported ${exported}/${taskPaths.length} task(s) to ${outRoot}`);

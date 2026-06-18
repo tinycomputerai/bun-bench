@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing git tag to release (example: v0.1.0)"
+        description: "Release tag to create (example: v0.1.0)"
         required: true
         type: string
       dry_run:
@@ -38,33 +38,25 @@ jobs:
       DRY_RUN: ${{ github.event.inputs.dry_run }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ github.event.inputs.tag }}
+          persist-credentials: false
 
-      - name: Verify tag exists
+      - name: Setup tinycomputer app
+        id: setup-releaser-app
+        uses: ./.github/actions/setup-releaser-app
+        with:
+          client-id: ${{ vars.TINYCOMPUTER_GITHUB_APP_CLIENT_ID }}
+          private-key: ${{ secrets.TINYCOMPUTER_GITHUB_APP_PRIVATE_KEY }}
+
+      - name: Require branch dispatch
         run: |
           set -euo pipefail
-          TAG="${{ github.event.inputs.tag }}"
-          git fetch --tags --force origin
-          if ! git rev-parse "refs/tags/${TAG}^{commit}" >/dev/null 2>&1; then
-            echo "Tag ${TAG} does not exist on the remote repository."
+          if [[ "${GITHUB_REF_TYPE}" != "branch" ]]; then
+            echo "Release workflow must be run from a branch, not ${GITHUB_REF_TYPE}."
             exit 1
           fi
-          echo "Found tag ${TAG}"
-
-      - name: Verify HEAD matches tag
-        run: |
-          set -euo pipefail
-          TAG="${{ github.event.inputs.tag }}"
-          HEAD_SHA="$(git rev-parse HEAD)"
-          TAG_SHA="$(git rev-parse "refs/tags/${TAG}^{commit}")"
-          if [ "${HEAD_SHA}" != "${TAG_SHA}" ]; then
-            echo "HEAD (${HEAD_SHA}) does not match tag ${TAG} (${TAG_SHA})."
-            exit 1
-          fi
-          echo "HEAD matches tag ${TAG}"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -100,19 +92,21 @@ jobs:
       - name: Verify release artifacts
         run: bun run release:verify -- --tag "${{ github.event.inputs.tag }}"
 
-      - name: Create GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          client-id: ${{ vars.TINYCOMPUTER_GITHUB_APP_CLIENT_ID }}
-          private-key: ${{ secrets.TINYCOMPUTER_GITHUB_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: ${{ github.event.repository.name }}
-          permission-contents: write
+      - name: Create and push release tag
+        if: github.event.inputs.dry_run != true
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists."
+            exit 1
+          fi
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "refs/tags/${TAG}"
 
       - name: Create GitHub Release
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ steps.setup-releaser-app.outputs.token }}
         run: |
           VERSION="${RELEASE_TAG#v}"
           if [ "${DRY_RUN}" = "true" ]; then

@@ -4,7 +4,7 @@ import { constructPrompt } from "../agent/prompt";
 import type { TaskConfig } from "../local/types";
 import { loadTaskDatasetMetadata, resolveTaskDirectory } from "./task-metadata";
 import { extractSolutionPatch, matchesReferenceSolution } from "./solution-patch";
-import type { ExportRunResult, ExportSkipReason, TaskDatasetMetadata } from "./types";
+import type { DatasetSplit, ExportRunResult, ExportSkipReason, TaskDatasetMetadata } from "./types";
 
 export type PreparedRun = {
   runDir: string;
@@ -20,6 +20,7 @@ export async function prepareRunForExport(
   runDir: string,
   options: {
     minScore: number;
+    allowPublicEval: boolean;
     allowPrivateEval: boolean;
     tasksRoot?: string;
   },
@@ -60,8 +61,9 @@ export async function prepareRunForExport(
     return { prepared: null, skipReason: "missing_task" };
   }
 
-  if (dataset.split === "private_eval" && !options.allowPrivateEval) {
-    return { prepared: null, skipReason: "private_eval_excluded" };
+  const splitSkipReason = splitExportSkipReason(dataset.split, options);
+  if (splitSkipReason) {
+    return { prepared: null, skipReason: splitSkipReason };
   }
 
   if (!dataset.trainable) {
@@ -130,6 +132,21 @@ async function loadPrompt(runDir: string, taskDir: string): Promise<string | nul
   return constructPrompt(taskDir, task).trim();
 }
 
+export function splitExportSkipReason(
+  split: DatasetSplit,
+  options: { allowPublicEval: boolean; allowPrivateEval: boolean },
+): ExportSkipReason | null {
+  if (split === "public_eval" && !options.allowPublicEval) {
+    return "public_eval_excluded";
+  }
+
+  if (split === "private_eval" && !options.allowPrivateEval) {
+    return "private_eval_excluded";
+  }
+
+  return null;
+}
+
 export function createSkipCounter(): Record<ExportSkipReason, number> {
   return {
     missing_result: 0,
@@ -137,6 +154,7 @@ export function createSkipCounter(): Record<ExportSkipReason, number> {
     not_agent_run: 0,
     below_min_score: 0,
     not_completed: 0,
+    public_eval_excluded: 0,
     private_eval_excluded: 0,
     not_trainable: 0,
     missing_task: 0,

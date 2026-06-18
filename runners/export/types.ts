@@ -39,6 +39,7 @@ export type ExportOptions = {
   runsPattern: string;
   outPath: string;
   minScore: number;
+  allowPublicEval: boolean;
   allowPrivateEval: boolean;
   tasksRoot?: string;
 };
@@ -49,6 +50,7 @@ export type ExportSkipReason =
   | "not_agent_run"
   | "below_min_score"
   | "not_completed"
+  | "public_eval_excluded"
   | "private_eval_excluded"
   | "not_trainable"
   | "missing_task"

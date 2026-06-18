@@ -25,6 +25,7 @@ Both commands accept the same options:
 | `--runs` | required | Glob or path to run directories containing `result.json` |
 | `--out` | required | Output JSONL path |
 | `--min-score` | `100` | Minimum score required for export |
+| `--allow-public-eval` | off | Include `public_eval` tasks (excluded by default) |
 | `--allow-private-eval` | off | Include `private_eval` tasks (excluded by default) |
 | `--tasks-root` | `tasks` | Task package root for prompts and dataset metadata |
 
@@ -48,7 +49,9 @@ local starter runs, and failed agent runs are skipped.
 The exporter enforces dataset hygiene:
 
 - **Score gate:** only runs with `score >= --min-score` (default full credit: 100)
-- **Split hygiene:** `private_eval` tasks are excluded unless `--allow-private-eval`
+- **Split hygiene:** `train` and `dev` tasks are included by default; `public_eval`
+  and `private_eval` tasks are excluded unless `--allow-public-eval` or
+  `--allow-private-eval` is set
 - **Trainability:** tasks with `dataset.trainable: false` are always excluded
 - **No hidden tests:** solution patches include only `src/**` and `package.json`
 - **No reference solutions:** runs whose workspace matches `solutions/reference` are excluded
@@ -144,6 +147,7 @@ When a run is not exported, the command reports aggregated skip reasons:
 | `not_agent_run` | Not an agent run (missing `mode: "agent"`) |
 | `not_completed` | Run did not reach `status: "completed"` |
 | `below_min_score` | Score below `--min-score` |
+| `public_eval_excluded` | Task split is `public_eval` and flag not set |
 | `private_eval_excluded` | Task split is `private_eval` and flag not set |
 | `not_trainable` | Task has `dataset.trainable: false` |
 | `missing_task` | Task package or dataset metadata not found |

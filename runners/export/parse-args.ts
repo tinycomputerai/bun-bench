@@ -5,6 +5,7 @@ export function parseExportArgs(argv: string[]): ExportOptions {
   let runsPattern: string | undefined;
   let outPath: string | undefined;
   let minScore = 100;
+  let allowPublicEval = false;
   let allowPrivateEval = false;
   let tasksRoot: string | undefined;
 
@@ -23,6 +24,10 @@ export function parseExportArgs(argv: string[]): ExportOptions {
     if (arg === "--min-score") {
       minScore = Number(args[index + 1]);
       index += 1;
+      continue;
+    }
+    if (arg === "--allow-public-eval") {
+      allowPublicEval = true;
       continue;
     }
     if (arg === "--allow-private-eval") {
@@ -49,6 +54,7 @@ export function parseExportArgs(argv: string[]): ExportOptions {
     runsPattern,
     outPath,
     minScore,
+    allowPublicEval,
     allowPrivateEval,
     tasksRoot,
   };
@@ -59,8 +65,9 @@ function usage(): string {
     "usage: bun run export:sft --runs <run-pattern> --out <output.jsonl> [options]",
     "",
     "options:",
-    "  --min-score <number>       minimum score to export (default: 100)",
-    "  --allow-private-eval       include private_eval tasks (default: excluded)",
-    "  --tasks-root <path>        task package root (default: tasks)",
+    "  --min-score <number>        minimum score to export (default: 100)",
+    "  --allow-public-eval         include public_eval tasks (default: excluded)",
+    "  --allow-private-eval        include private_eval tasks (default: excluded)",
+    "  --tasks-root <path>         task package root (default: tasks)",
   ].join("\n");
 }

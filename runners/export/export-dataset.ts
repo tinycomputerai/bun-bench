@@ -25,6 +25,7 @@ async function exportDataset<T extends SftRecord | PatchRecord>(
   for (const runDir of runDirs) {
     const { prepared, skipReason } = await prepareRunForExport(runDir, {
       minScore: options.minScore,
+      allowPublicEval: options.allowPublicEval,
       allowPrivateEval: options.allowPrivateEval,
       tasksRoot: options.tasksRoot,
     });

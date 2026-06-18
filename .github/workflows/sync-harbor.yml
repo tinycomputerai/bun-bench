@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "tasks/**"
+  workflow_dispatch:
 
 permissions:
   contents: read

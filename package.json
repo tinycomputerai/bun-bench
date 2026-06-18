@@ -4,10 +4,10 @@
   "type": "module",
   "devDependencies": {
     "@commitlint/cli": "21.0.1",
-    "@release-it/conventional-changelog": "^11.0.1",
+    "@release-it/conventional-changelog": "11.0.1",
     "@types/bun": "latest",
-    "release-it": "^20.2.0",
-    "typescript": "^5.9.3"
+    "release-it": "20.2.0",
+    "typescript": "5.9.3"
   },
   "scripts": {
     "validate": "bun run validate:tasks",

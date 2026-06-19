@@ -7,3 +7,4 @@ release-assets/
 .release-staging-fetch/
 dist/
 runners/export/.tmp-export-*
+.env

@@ -6,7 +6,7 @@ import {
   selectRetryTaskIds,
   taskPathFromTaskId,
 } from "./load-leaderboard";
-import { sortEntriesByTaskId, buildSummary } from "./suite";
+import { buildSummary, sortEntriesByTaskId } from "./suite";
 import type { LeaderboardEntry, SuiteLeaderboard } from "./types";
 
 function entry(taskId: string, score: number): LeaderboardEntry {
@@ -22,7 +22,7 @@ function entry(taskId: string, score: number): LeaderboardEntry {
 describe("suite retry helpers", () => {
   test("maps task ids to task paths", () => {
     expect(taskPathFromTaskId("authentication.jwt-verify.v1")).toBe(
-      "tasks/authentication.jwt-verify.v1",
+      "tasks/authentication.jwt-verify.v1"
     );
   });
 
@@ -51,7 +51,13 @@ describe("suite retry helpers", () => {
     };
 
     expect(
-      selectRetryTaskIds(leaderboard, ["alpha.v1", "beta.v1", "gamma.v1", "delta.v1", "echo.v1"]),
+      selectRetryTaskIds(leaderboard, [
+        "alpha.v1",
+        "beta.v1",
+        "gamma.v1",
+        "delta.v1",
+        "echo.v1",
+      ])
     ).toEqual(["beta.v1", "delta.v1", "echo.v1"]);
   });
 
@@ -81,13 +87,21 @@ describe("suite concurrency", () => {
   });
 
   test("rejects concurrency below 1", () => {
-    expect(() => parseConcurrency("0")).toThrow("--concurrency must be an integer >= 1");
-    expect(() => parseConcurrency("-1")).toThrow("--concurrency must be an integer >= 1");
+    expect(() => parseConcurrency("0")).toThrow(
+      "--concurrency must be an integer >= 1"
+    );
+    expect(() => parseConcurrency("-1")).toThrow(
+      "--concurrency must be an integer >= 1"
+    );
   });
 
   test("rejects non-integer concurrency", () => {
-    expect(() => parseConcurrency("2.5")).toThrow("--concurrency must be an integer >= 1");
-    expect(() => parseConcurrency("nope")).toThrow("--concurrency must be an integer >= 1");
+    expect(() => parseConcurrency("2.5")).toThrow(
+      "--concurrency must be an integer >= 1"
+    );
+    expect(() => parseConcurrency("nope")).toThrow(
+      "--concurrency must be an integer >= 1"
+    );
   });
 });
 
@@ -112,10 +126,10 @@ describe("suite summary", () => {
     const summary = buildSummary(
       "claude-code",
       [entry("alpha.v1", 100), entry("beta.v1", 25)],
-      120000,
+      120_000,
       "2026-06-18T00:00:00.000Z",
       "2026-06-18T00:02:00.000Z",
-      50,
+      50
     );
 
     expect(summary.total_tasks).toBe(50);

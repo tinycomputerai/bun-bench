@@ -9,7 +9,10 @@ import { dirname } from "node:path";
  */
 
 /** Time left for a phase, bounded by both its own budget and the run deadline. */
-export function remainingMs(deadlineMs: number, phaseTimeoutMs: number): number {
+export function remainingMs(
+  deadlineMs: number,
+  phaseTimeoutMs: number
+): number {
   const remainingTotal = Math.max(0, deadlineMs - Date.now());
   return Math.max(0, Math.min(phaseTimeoutMs, remainingTotal));
 }
@@ -24,7 +27,7 @@ export function prepareLogFiles(stdoutPath: string, stderrPath: string): void {
 /** Stream a child process output stream to a file as it is produced. */
 export async function pipeToFile(
   stream: ReadableStream<Uint8Array> | null,
-  filePath: string,
+  filePath: string
 ): Promise<void> {
   if (!stream) {
     return;

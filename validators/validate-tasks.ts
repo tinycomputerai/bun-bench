@@ -39,7 +39,9 @@ for (const taskDir of taskDirs) {
 }
 
 if (invalidCount > 0) {
-  console.error(`validation failed: ${invalidCount}/${taskDirs.length} task(s) invalid`);
+  console.error(
+    `validation failed: ${invalidCount}/${taskDirs.length} task(s) invalid`
+  );
   process.exit(1);
 }
 

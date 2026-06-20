@@ -1,13 +1,19 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join, relative } from "node:path";
 
 const TASKS_LOCK_FILE = "tasks-lock.json";
 
-export type TasksLock = {
+export interface TasksLock {
   checksum: string;
   tasks: Record<string, string>;
-};
+}
 
 export function tasksLockPath(harborRoot: string): string {
   return join(harborRoot, TASKS_LOCK_FILE);
@@ -20,7 +26,11 @@ export function readTasksLock(harborRoot: string): TasksLock | null {
   }
 
   const lock = JSON.parse(readFileSync(lockPath, "utf8")) as TasksLock;
-  if (typeof lock.checksum !== "string" || typeof lock.tasks !== "object" || lock.tasks === null) {
+  if (
+    typeof lock.checksum !== "string" ||
+    typeof lock.tasks !== "object" ||
+    lock.tasks === null
+  ) {
     throw new Error(`${lockPath} must contain checksum and tasks fields`);
   }
 
@@ -58,7 +68,10 @@ export function hashDirectory(dir: string): string {
 
 function hashHarborRoot(harborRoot: string): string {
   const files = listFilesRecursive(harborRoot)
-    .filter((file) => relative(harborRoot, file).split("\\").join("/") !== TASKS_LOCK_FILE)
+    .filter(
+      (file) =>
+        relative(harborRoot, file).split("\\").join("/") !== TASKS_LOCK_FILE
+    )
     .sort();
   return hashFiles(harborRoot, files);
 }
@@ -71,7 +84,9 @@ export function discoverHarborTaskDirs(harborRoot: string): string[] {
   return readdirSync(harborRoot)
     .filter((entry) => {
       const full = join(harborRoot, entry);
-      return statSync(full).isDirectory() && existsSync(join(full, "task.toml"));
+      return (
+        statSync(full).isDirectory() && existsSync(join(full, "task.toml"))
+      );
     })
     .sort();
 }
@@ -98,7 +113,7 @@ export function writeTasksLock(harborRoot: string): string {
   return lockPath;
 }
 
-async function main(): Promise<void> {
+function main(): void {
   const harborRoot = process.argv[2] ?? "harbor";
   if (!existsSync(harborRoot)) {
     throw new Error(`harbor export directory not found: ${harborRoot}`);
@@ -106,12 +121,16 @@ async function main(): Promise<void> {
 
   const lockPath = writeTasksLock(harborRoot);
   const taskCount = discoverHarborTaskDirs(harborRoot).length;
-  console.log(`[harbor] wrote tasks lock for ${taskCount} task(s) to ${lockPath}`);
+  console.log(
+    `[harbor] wrote tasks lock for ${taskCount} task(s) to ${lockPath}`
+  );
 }
 
 if (import.meta.main) {
-  main().catch((error) => {
+  try {
+    main();
+  } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
-  });
+  }
 }

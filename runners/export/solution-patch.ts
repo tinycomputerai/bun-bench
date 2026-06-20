@@ -1,16 +1,26 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { FORBIDDEN_EXPORT_SEGMENTS, SOLUTION_FILES, SOLUTION_ROOTS } from "./constants";
+import {
+  FORBIDDEN_EXPORT_SEGMENTS,
+  SOLUTION_FILES,
+  SOLUTION_ROOTS,
+} from "./constants";
 import type { SolutionPatch } from "./types";
 
 type FileSnapshot = Map<string, string>;
 
-export function extractSolutionPatch(taskDir: string, workspaceDir: string): SolutionPatch | null {
+export function extractSolutionPatch(
+  taskDir: string,
+  workspaceDir: string
+): SolutionPatch | null {
   const starterFiles = collectSolutionFiles(taskDir, "starter");
   const workspaceFiles = collectSolutionFiles(workspaceDir, "workspace");
 
   const changedPaths = new Set<string>();
-  for (const path of new Set([...starterFiles.keys(), ...workspaceFiles.keys()])) {
+  for (const path of new Set([
+    ...starterFiles.keys(),
+    ...workspaceFiles.keys(),
+  ])) {
     if (starterFiles.get(path) !== workspaceFiles.get(path)) {
       changedPaths.add(path);
     }
@@ -31,8 +41,8 @@ export function extractSolutionPatch(taskDir: string, workspaceDir: string): Sol
       unifiedDiff(
         path,
         starterFiles.get(path) ?? "",
-        workspaceFiles.get(path) ?? "",
-      ),
+        workspaceFiles.get(path) ?? ""
+      )
     );
   }
 
@@ -42,7 +52,10 @@ export function extractSolutionPatch(taskDir: string, workspaceDir: string): Sol
   };
 }
 
-export function matchesReferenceSolution(taskDir: string, workspaceDir: string): boolean {
+export function matchesReferenceSolution(
+  taskDir: string,
+  workspaceDir: string
+): boolean {
   const referenceDir = join(taskDir, "solutions", "reference");
   if (!existsSync(referenceDir)) {
     return false;
@@ -109,14 +122,24 @@ function stripForbiddenContent(content: string): string {
   }
   return content
     .split("\n")
-    .filter((line) => !FORBIDDEN_EXPORT_SEGMENTS.some((segment) => line.includes(segment)))
+    .filter(
+      (line) =>
+        !FORBIDDEN_EXPORT_SEGMENTS.some((segment) => line.includes(segment))
+    )
     .join("\n");
 }
 
-function collectDirectoryFiles(absoluteRoot: string, relativeRoot: string, files: FileSnapshot): void {
+function collectDirectoryFiles(
+  absoluteRoot: string,
+  relativeRoot: string,
+  files: FileSnapshot
+): void {
   for (const entry of walkDirectory(absoluteRoot)) {
     const relativePath = relative(absoluteRoot, entry).replace(/\\/g, "/");
-    const normalizedPath = `${relativeRoot}/${relativePath}`.replace(/\/+/g, "/");
+    const normalizedPath = `${relativeRoot}/${relativePath}`.replace(
+      /\/+/g,
+      "/"
+    );
     files.set(normalizedPath, readTextFile(entry));
   }
 }
@@ -145,10 +168,16 @@ function readTextFile(path: string): string {
 
 function containsForbiddenSegment(path: string): boolean {
   const normalized = path.replace(/\\/g, "/");
-  return FORBIDDEN_EXPORT_SEGMENTS.some((segment) => normalized.includes(segment));
+  return FORBIDDEN_EXPORT_SEGMENTS.some((segment) =>
+    normalized.includes(segment)
+  );
 }
 
-function unifiedDiff(path: string, oldContent: string, newContent: string): string {
+function unifiedDiff(
+  path: string,
+  oldContent: string,
+  newContent: string
+): string {
   const oldLines = oldContent.length > 0 ? oldContent.split("\n") : [];
   const newLines = newContent.length > 0 ? newContent.split("\n") : [];
 
@@ -169,15 +198,17 @@ function unifiedDiff(path: string, oldContent: string, newContent: string): stri
   }
 
   const chunks = buildDiffChunks(oldLines, newLines);
-  const body = chunks.map((chunk) => formatChunk(chunk, oldLines, newLines)).join("\n");
+  const body = chunks
+    .map((chunk) => formatChunk(chunk, oldLines, newLines))
+    .join("\n");
   return `${header.join("\n")}\n${body}`;
 }
 
-type DiffChunk = {
-  oldStart: number;
-  newStart: number;
+interface DiffChunk {
   lines: string[];
-};
+  newStart: number;
+  oldStart: number;
+}
 
 function buildDiffChunks(oldLines: string[], newLines: string[]): DiffChunk[] {
   const chunks: DiffChunk[] = [];
@@ -206,7 +237,11 @@ function buildDiffChunks(oldLines: string[], newLines: string[]): DiffChunk[] {
       const oldLine = oldLines[oldIndex];
       const newLine = newLines[newIndex];
 
-      if (oldIndex < oldLines.length && newIndex < newLines.length && oldLine === newLine) {
+      if (
+        oldIndex < oldLines.length &&
+        newIndex < newLines.length &&
+        oldLine === newLine
+      ) {
         break;
       }
 
@@ -232,7 +267,10 @@ function buildDiffChunks(oldLines: string[], newLines: string[]): DiffChunk[] {
         continue;
       }
 
-      if (oldIndex < oldLines.length && (newIndex >= newLines.length || oldLine !== newLine)) {
+      if (
+        oldIndex < oldLines.length &&
+        (newIndex >= newLines.length || oldLine !== newLine)
+      ) {
         lines.push(`-${oldLine}`);
         oldIndex += 1;
         continue;
@@ -254,9 +292,17 @@ function buildDiffChunks(oldLines: string[], newLines: string[]): DiffChunk[] {
   return chunks;
 }
 
-function formatChunk(chunk: DiffChunk, oldLines: string[], newLines: string[]): string {
-  const oldCount = chunk.lines.filter((line) => line.startsWith("-") || line.startsWith(" ")).length;
-  const newCount = chunk.lines.filter((line) => line.startsWith("+") || line.startsWith(" ")).length;
+function formatChunk(
+  chunk: DiffChunk,
+  _oldLines: string[],
+  _newLines: string[]
+): string {
+  const oldCount = chunk.lines.filter(
+    (line) => line.startsWith("-") || line.startsWith(" ")
+  ).length;
+  const newCount = chunk.lines.filter(
+    (line) => line.startsWith("+") || line.startsWith(" ")
+  ).length;
   const hunkHeader = `@@ -${chunk.oldStart},${Math.max(oldCount, 1)} +${chunk.newStart},${Math.max(newCount, 1)} @@`;
   return `${hunkHeader}\n${chunk.lines.join("\n")}`;
 }

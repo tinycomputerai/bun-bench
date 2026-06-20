@@ -49,7 +49,9 @@ function usage(): string {
 }
 
 async function main(): Promise<void> {
-  const { tasksPattern, outRoot, changedSince } = parseArgs(process.argv.slice(2));
+  const { tasksPattern, outRoot, changedSince } = parseArgs(
+    process.argv.slice(2)
+  );
   const harborRoot = resolve(process.cwd(), outRoot);
   if (!existsSync(harborRoot)) {
     console.error(`harbor export directory not found: ${harborRoot}`);
@@ -68,23 +70,29 @@ async function main(): Promise<void> {
   for (const issue of result.issues) {
     switch (issue.kind) {
       case "missing_export":
-        console.error(`invalid tasks lock: missing export for ${issue.taskPath} (${issue.slug})`);
+        console.error(
+          `invalid tasks lock: missing export for ${issue.taskPath} (${issue.slug})`
+        );
         break;
       case "checksum_mismatch":
         console.error(
-          `invalid tasks lock: checksum mismatch for ${issue.taskPath} (${issue.slug}): expected ${issue.expected}, actual ${issue.actual}`,
+          `invalid tasks lock: checksum mismatch for ${issue.taskPath} (${issue.slug}): expected ${issue.expected}, actual ${issue.actual}`
         );
         break;
       case "source_changed":
-        console.error(`invalid tasks lock: source changed for ${issue.taskPath} (${issue.slug})`);
+        console.error(
+          `invalid tasks lock: source changed for ${issue.taskPath} (${issue.slug})`
+        );
         break;
       case "stale_export":
         console.error(`invalid tasks lock: stale export ${issue.slug}`);
         break;
       case "aggregate_checksum_mismatch":
         console.error(
-          `invalid tasks lock: aggregate checksum mismatch: expected ${issue.expected}, actual ${issue.actual}`,
+          `invalid tasks lock: aggregate checksum mismatch: expected ${issue.expected}, actual ${issue.actual}`
         );
+        break;
+      default:
         break;
     }
   }

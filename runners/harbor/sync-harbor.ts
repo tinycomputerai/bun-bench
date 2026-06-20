@@ -10,17 +10,17 @@ import { writeTasksLock } from "./tasks-lock";
 import {
   findChangedTaskPaths,
   slugForTaskPath,
-  validateTasksLock,
   type TasksLockValidationResult,
+  validateTasksLock,
 } from "./validate-tasks-lock";
 
 const DEFAULT_OUT_ROOT = "harbor";
 
-type SyncOptions = {
-  tasksPattern: string;
-  outRoot: string;
+interface SyncOptions {
   changedSince?: string;
-};
+  outRoot: string;
+  tasksPattern: string;
+}
 
 function parseArgs(argv: string[]): SyncOptions {
   const args = argv.filter((arg) => arg !== "--");
@@ -59,6 +59,7 @@ function usage(): string {
   return [
     "usage: bun run harbor:sync --tasks '<pattern>' [--out <out-root>] [--changed-since <git-ref>]",
     "",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: literal GitHub Actions example syntax
     "example: bun run harbor:sync --tasks 'tasks/**' --changed-since ${{ github.event.before }}",
   ].join("\n");
 }
@@ -74,30 +75,38 @@ function logValidation(result: TasksLockValidationResult): void {
   for (const issue of result.issues) {
     switch (issue.kind) {
       case "missing_export":
-        console.log(`[harbor:sync] missing export for ${issue.taskPath} (${issue.slug})`);
+        console.log(
+          `[harbor:sync] missing export for ${issue.taskPath} (${issue.slug})`
+        );
         break;
       case "checksum_mismatch":
         console.log(
-          `[harbor:sync] checksum mismatch for ${issue.taskPath} (${issue.slug}): expected ${issue.expected}, actual ${issue.actual}`,
+          `[harbor:sync] checksum mismatch for ${issue.taskPath} (${issue.slug}): expected ${issue.expected}, actual ${issue.actual}`
         );
         break;
       case "source_changed":
-        console.log(`[harbor:sync] source changed for ${issue.taskPath} (${issue.slug})`);
+        console.log(
+          `[harbor:sync] source changed for ${issue.taskPath} (${issue.slug})`
+        );
         break;
       case "stale_export":
         console.log(`[harbor:sync] stale export ${issue.slug}`);
         break;
       case "aggregate_checksum_mismatch":
         console.log(
-          `[harbor:sync] aggregate checksum mismatch: expected ${issue.expected}, actual ${issue.actual}`,
+          `[harbor:sync] aggregate checksum mismatch: expected ${issue.expected}, actual ${issue.actual}`
         );
+        break;
+      default:
         break;
     }
   }
 }
 
 async function main(): Promise<void> {
-  const { tasksPattern, outRoot, changedSince } = parseArgs(process.argv.slice(2));
+  const { tasksPattern, outRoot, changedSince } = parseArgs(
+    process.argv.slice(2)
+  );
   const harborRoot = resolve(process.cwd(), outRoot);
   if (!existsSync(harborRoot)) {
     throw new Error(`harbor export directory not found: ${harborRoot}`);
@@ -109,7 +118,9 @@ async function main(): Promise<void> {
   }
 
   const changedTaskPaths = findChangedTaskPaths(taskPaths, changedSince);
-  const validation = validateTasksLock(harborRoot, taskPaths, { changedTaskPaths });
+  const validation = validateTasksLock(harborRoot, taskPaths, {
+    changedTaskPaths,
+  });
   logValidation(validation);
 
   if (validation.isValid) {
@@ -125,7 +136,9 @@ async function main(): Promise<void> {
       console.log(`[harbor:sync] exported ${result.id} -> ${result.outDir}`);
     } catch (error) {
       failed += 1;
-      console.error(`[harbor:sync] FAIL ${taskPath}: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `[harbor:sync] FAIL ${taskPath}: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -144,7 +157,7 @@ async function main(): Promise<void> {
   console.log(`[harbor:sync] wrote tasks lock to ${lockPath}`);
   syncDataset(outRoot);
   console.log(
-    `[harbor:sync] synced ${exported} task export(s), removed ${removed.length} stale export(s)`,
+    `[harbor:sync] synced ${exported} task export(s), removed ${removed.length} stale export(s)`
   );
 }
 

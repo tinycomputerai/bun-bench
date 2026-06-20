@@ -4,10 +4,16 @@ import { parseArgs } from "./cli";
 import { runSuite } from "./suite";
 
 async function main(): Promise<void> {
-  const { agentId, tasksPattern, failedFrom, concurrency } = parseArgs(process.argv.slice(2));
-  const result = await runSuite(agentId, { tasksPattern, failedFrom, concurrency });
+  const { agentId, tasksPattern, failedFrom, concurrency } = parseArgs(
+    process.argv.slice(2)
+  );
+  const result = await runSuite(agentId, {
+    tasksPattern,
+    failedFrom,
+    concurrency,
+  });
 
-  console.log(`\n[suite] complete`);
+  console.log("\n[suite] complete");
   console.log(`agent: ${result.summary.agent_id}`);
   console.log(`tasks: ${result.summary.total_tasks}`);
   console.log(`passed: ${result.summary.passed}`);

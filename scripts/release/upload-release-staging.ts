@@ -1,15 +1,17 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { parseReleaseArgs, usage } from "./parse-args";
-import { assertReleaseAssets } from "./release-assets";
 import { HF_DATASET_REPO, hfStagingPaths, repoRoot } from "./paths";
+import { assertReleaseAssets } from "./release-assets";
 
-type UploadSpec = {
+interface UploadSpec {
   localPath: string;
   remotePath: string;
-};
+}
 
-function buildUploadSpecs(tag: string, assets: { sft: string; patches: string }): UploadSpec[] {
+function buildUploadSpecs(
+  tag: string,
+  assets: { sft: string; patches: string }
+): UploadSpec[] {
   const staging = hfStagingPaths(tag);
   return [
     { localPath: assets.sft, remotePath: staging.sft },
@@ -31,7 +33,7 @@ function buildUploadCommand(spec: UploadSpec, tag: string): string[] {
   ];
 }
 
-async function ensureHuggingfaceCli(): Promise<void> {
+function ensureHuggingfaceCli(): void {
   const check = Bun.spawnSync(["huggingface-cli", "--help"], {
     stdout: "ignore",
     stderr: "ignore",
@@ -41,10 +43,13 @@ async function ensureHuggingfaceCli(): Promise<void> {
     return;
   }
 
-  const install = Bun.spawnSync(["python3", "-m", "pip", "install", "--quiet", "huggingface_hub"], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
+  const install = Bun.spawnSync(
+    ["python3", "-m", "pip", "install", "--quiet", "huggingface_hub"],
+    {
+      stdout: "inherit",
+      stderr: "inherit",
+    }
+  );
 
   if (install.exitCode !== 0) {
     throw new Error("failed to install huggingface_hub (huggingface-cli)");
@@ -74,7 +79,7 @@ async function uploadFile(spec: UploadSpec, tag: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  let options;
+  let options: ReturnType<typeof parseReleaseArgs>;
   try {
     options = parseReleaseArgs(process.argv.slice(2));
   } catch (error) {
@@ -83,7 +88,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  let assets;
+  let assets: ReturnType<typeof assertReleaseAssets>;
   try {
     assets = assertReleaseAssets();
   } catch (error) {
@@ -98,7 +103,7 @@ async function main(): Promise<void> {
     console.log("[release:upload-staging] dry run — would run:");
     for (const spec of specs) {
       console.log(
-        `  HF_TOKEN=*** huggingface-cli upload ${HF_DATASET_REPO} ${spec.localPath} ${spec.remotePath} --repo-type dataset --commit-message "Stage release assets for ${options.tag}"`,
+        `  HF_TOKEN=*** huggingface-cli upload ${HF_DATASET_REPO} ${spec.localPath} ${spec.remotePath} --repo-type dataset --commit-message "Stage release assets for ${options.tag}"`
       );
     }
     return;
@@ -108,13 +113,17 @@ async function main(): Promise<void> {
 
   for (const spec of specs) {
     if (!existsSync(spec.localPath)) {
-      console.error(`[release:upload-staging] missing staged asset: ${spec.localPath}`);
+      console.error(
+        `[release:upload-staging] missing staged asset: ${spec.localPath}`
+      );
       process.exit(1);
     }
     await uploadFile(spec, options.tag);
   }
 
-  console.log(`[release:upload-staging] staged release assets for ${options.tag} on ${HF_DATASET_REPO}`);
+  console.log(
+    `[release:upload-staging] staged release assets for ${options.tag} on ${HF_DATASET_REPO}`
+  );
   for (const spec of specs) {
     console.log(`  ${spec.remotePath}`);
   }

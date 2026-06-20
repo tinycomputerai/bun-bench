@@ -5,14 +5,19 @@ import { parseReleaseArgs, usage } from "./parse-args";
 import { repoRoot } from "./paths";
 
 const HARBOR_CREDENTIALS_DIR = join(homedir(), ".harbor");
-const HARBOR_CREDENTIALS_PATH = join(HARBOR_CREDENTIALS_DIR, "credentials.json");
+const HARBOR_CREDENTIALS_PATH = join(
+  HARBOR_CREDENTIALS_DIR,
+  "credentials.json"
+);
 
 function decodeHarborToken(encoded: string): string {
   let decoded: string;
   try {
     decoded = Buffer.from(encoded, "base64").toString("utf8").trim();
   } catch {
-    throw new Error("HARBOR_TOKEN must be a valid base64-encoded Harbor credentials payload");
+    throw new Error(
+      "HARBOR_TOKEN must be a valid base64-encoded Harbor credentials payload"
+    );
   }
 
   if (decoded.length === 0) {
@@ -22,7 +27,9 @@ function decodeHarborToken(encoded: string): string {
   try {
     JSON.parse(decoded);
   } catch {
-    throw new Error("HARBOR_TOKEN must decode to Harbor credentials JSON (~/.harbor/credentials.json)");
+    throw new Error(
+      "HARBOR_TOKEN must decode to Harbor credentials JSON (~/.harbor/credentials.json)"
+    );
   }
 
   return decoded;
@@ -51,7 +58,7 @@ function buildDatasetCommand(tag: string, datasetToml: string): string[] {
   return ["uvx", "harbor", "publish", datasetToml, "-t", tag, "--public"];
 }
 
-async function run(command: string[], confirm: boolean): Promise<number> {
+function run(command: string[], confirm: boolean): Promise<number> {
   const proc = Bun.spawn(command, {
     cwd: repoRoot(),
     // Publishing a dataset as public prompts for confirmation; feed "y".
@@ -64,7 +71,7 @@ async function run(command: string[], confirm: boolean): Promise<number> {
 }
 
 async function main(): Promise<void> {
-  let options;
+  let options: ReturnType<typeof parseReleaseArgs>;
   try {
     options = parseReleaseArgs(process.argv.slice(2));
   } catch (error) {
@@ -75,13 +82,17 @@ async function main(): Promise<void> {
 
   const harborRoot = join(repoRoot(), "harbor");
   if (!existsSync(harborRoot)) {
-    console.error(`[release:harbor] harbor export directory not found: ${harborRoot}`);
+    console.error(
+      `[release:harbor] harbor export directory not found: ${harborRoot}`
+    );
     process.exit(1);
   }
 
   const taskDirs = findTaskDirs(harborRoot);
   if (taskDirs.length === 0) {
-    console.error(`[release:harbor] no task packages found under ${harborRoot}`);
+    console.error(
+      `[release:harbor] no task packages found under ${harborRoot}`
+    );
     process.exit(1);
   }
 
@@ -90,13 +101,19 @@ async function main(): Promise<void> {
 
   // Tasks must be published before the dataset, which references them by digest.
   const tasksCommand = buildTasksCommand(options.tag, taskDirs);
-  const datasetCommand = hasDataset ? buildDatasetCommand(options.tag, datasetToml) : null;
+  const datasetCommand = hasDataset
+    ? buildDatasetCommand(options.tag, datasetToml)
+    : null;
 
   if (options.dryRun) {
     console.log("[release:harbor] dry run — would run:");
-    console.log(`  HARBOR_TOKEN=*** ${["uvx", "harbor", "publish", `<${taskDirs.length} task dirs>`, "-t", options.tag, "--public"].join(" ")}`);
+    console.log(
+      `  HARBOR_TOKEN=*** ${["uvx", "harbor", "publish", `<${taskDirs.length} task dirs>`, "-t", options.tag, "--public"].join(" ")}`
+    );
     if (datasetCommand) {
-      console.log(`  HARBOR_TOKEN=*** ${datasetCommand.join(" ")}  (auto-confirmed)`);
+      console.log(
+        `  HARBOR_TOKEN=*** ${datasetCommand.join(" ")}  (auto-confirmed)`
+      );
     }
     return;
   }
@@ -107,7 +124,9 @@ async function main(): Promise<void> {
   }
   installHarborCredentials(decodeHarborToken(encoded));
 
-  console.log(`[release:harbor] publishing ${taskDirs.length} task package(s)…`);
+  console.log(
+    `[release:harbor] publishing ${taskDirs.length} task package(s)…`
+  );
   const tasksExit = await run(tasksCommand, false);
   if (tasksExit !== 0) {
     process.exit(tasksExit);

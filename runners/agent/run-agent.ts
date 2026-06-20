@@ -20,18 +20,18 @@ function parseArgs(argv: string[]): { taskPath: string; agentId: string } {
       index += 1;
       continue;
     }
-    if (!taskPath && !arg.startsWith("-")) {
+    if (!(taskPath || arg.startsWith("-"))) {
       taskPath = arg;
       continue;
     }
     throw new Error(
-      `usage: bun run run:agent --task <task-path> --agent <agent-id>\n\nsupported agents: ${SUPPORTED_AGENTS.join(", ")}`,
+      `usage: bun run run:agent --task <task-path> --agent <agent-id>\n\nsupported agents: ${SUPPORTED_AGENTS.join(", ")}`
     );
   }
 
-  if (!taskPath || !agentId) {
+  if (!(taskPath && agentId)) {
     throw new Error(
-      `usage: bun run run:agent --task <task-path> --agent <agent-id>\n\nsupported agents: ${SUPPORTED_AGENTS.join(", ")}`,
+      `usage: bun run run:agent --task <task-path> --agent <agent-id>\n\nsupported agents: ${SUPPORTED_AGENTS.join(", ")}`
     );
   }
 

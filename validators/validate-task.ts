@@ -3,49 +3,57 @@
 import { existsSync, statSync } from "node:fs";
 import { basename, isAbsolute, relative, resolve } from "node:path";
 
-type JsonSchema = {
+const TRAILING_ZEROS_RE = /0+$/;
+const TRAILING_DOT_RE = /\.$/;
+
+interface JsonSchema {
+  $defs?: Record<string, JsonSchema>;
   $ref?: string;
-  type?: string | string[];
+  additionalProperties?: boolean | JsonSchema;
   const?: unknown;
   enum?: unknown[];
-  required?: string[];
-  properties?: Record<string, JsonSchema>;
-  patternProperties?: Record<string, JsonSchema>;
-  additionalProperties?: boolean | JsonSchema;
   items?: JsonSchema;
-  minItems?: number;
   maxItems?: number;
-  uniqueItems?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  pattern?: string;
-  minimum?: number;
   maximum?: number;
-  $defs?: Record<string, JsonSchema>;
-};
+  maxLength?: number;
+  minItems?: number;
+  minimum?: number;
+  minLength?: number;
+  pattern?: string;
+  patternProperties?: Record<string, JsonSchema>;
+  properties?: Record<string, JsonSchema>;
+  required?: string[];
+  type?: string | string[];
+  uniqueItems?: boolean;
+}
 
-export type ValidationResult = {
+export interface ValidationResult {
+  errors: string[];
   taskDir: string;
   taskId?: string;
-  errors: string[];
-};
+}
 
-type ValidationContext = {
-  taskDir: string;
+interface ValidationContext {
   errors: string[];
-};
+  taskDir: string;
+}
 
 const repoRoot = resolve(import.meta.dir, "..");
 const schemaPath = resolve(repoRoot, "schemas/task.schema.json");
 const schema = (await Bun.file(schemaPath).json()) as JsonSchema;
 
-export async function validateTaskDirectory(taskDirInput: string): Promise<ValidationResult> {
+export async function validateTaskDirectory(
+  taskDirInput: string
+): Promise<ValidationResult> {
   const taskDir = resolve(process.cwd(), taskDirInput);
   const errors: string[] = [];
   const ctx: ValidationContext = { taskDir, errors };
 
   if (!existsSync(taskDir)) {
-    return { taskDir, errors: [`${taskDirInput}: task directory does not exist`] };
+    return {
+      taskDir,
+      errors: [`${taskDirInput}: task directory does not exist`],
+    };
   }
   if (!statSync(taskDir).isDirectory()) {
     return { taskDir, errors: [`${taskDirInput}: path is not a directory`] };
@@ -62,7 +70,9 @@ export async function validateTaskDirectory(taskDirInput: string): Promise<Valid
   } catch (error) {
     return {
       taskDir,
-      errors: [`task.yaml: failed to parse YAML: ${error instanceof Error ? error.message : String(error)}`],
+      errors: [
+        `task.yaml: failed to parse YAML: ${error instanceof Error ? error.message : String(error)}`,
+      ],
     };
   }
 
@@ -106,36 +116,44 @@ function validateLayout(ctx: ValidationContext): void {
 
   for (const file of requiredFiles) {
     const path = resolve(ctx.taskDir, file);
-    if (!existsSync(path) || !statSync(path).isFile()) {
+    if (!(existsSync(path) && statSync(path).isFile())) {
       ctx.errors.push(`${file}: missing required file`);
     }
   }
 
   const hasModernLock = existsSync(resolve(ctx.taskDir, "bun.lock"));
   const hasLegacyLock = existsSync(resolve(ctx.taskDir, "bun.lockb"));
-  if (!hasModernLock && !hasLegacyLock) {
+  if (!(hasModernLock || hasLegacyLock)) {
     ctx.errors.push("bun.lock or bun.lockb: missing required Bun lockfile");
   }
 
   for (const dir of requiredDirs) {
     const path = resolve(ctx.taskDir, dir);
-    if (!existsSync(path) || !statSync(path).isDirectory()) {
+    if (!(existsSync(path) && statSync(path).isDirectory())) {
       ctx.errors.push(`${dir}: missing required directory`);
     }
   }
 }
 
-function validateTaskIdMatchesDirectory(ctx: ValidationContext, taskId?: string): void {
+function validateTaskIdMatchesDirectory(
+  ctx: ValidationContext,
+  taskId?: string
+): void {
   if (!taskId) {
     return;
   }
 
   if (basename(ctx.taskDir) !== taskId) {
-    ctx.errors.push(`id: task id "${taskId}" must match directory name "${basename(ctx.taskDir)}"`);
+    ctx.errors.push(
+      `id: task id "${taskId}" must match directory name "${basename(ctx.taskDir)}"`
+    );
   }
 }
 
-function validateTagsIncludeCategory(ctx: ValidationContext, task: Record<string, unknown>): void {
+function validateTagsIncludeCategory(
+  ctx: ValidationContext,
+  task: Record<string, unknown>
+): void {
   if (typeof task.category !== "string" || !Array.isArray(task.tags)) {
     return;
   }
@@ -145,18 +163,26 @@ function validateTagsIncludeCategory(ctx: ValidationContext, task: Record<string
   }
 }
 
-function validateDatasetPolicy(ctx: ValidationContext, task: Record<string, unknown>): void {
+function validateDatasetPolicy(
+  ctx: ValidationContext,
+  task: Record<string, unknown>
+): void {
   const dataset = asRecord(task.dataset);
   if (!dataset) {
     return;
   }
 
   if (dataset.split === "private_eval" && dataset.trainable !== false) {
-    ctx.errors.push("dataset.trainable: private_eval tasks must have trainable: false");
+    ctx.errors.push(
+      "dataset.trainable: private_eval tasks must have trainable: false"
+    );
   }
 }
 
-function validateReferencedFiles(ctx: ValidationContext, task: Record<string, unknown>): void {
+function validateReferencedFiles(
+  ctx: ValidationContext,
+  task: Record<string, unknown>
+): void {
   const instruction = asRecord(task.instruction);
   if (instruction && typeof instruction.prompt_file === "string") {
     assertExistingFile(ctx, "instruction.prompt_file", instruction.prompt_file);
@@ -166,7 +192,7 @@ function validateReferencedFiles(ctx: ValidationContext, task: Record<string, un
   if (tests) {
     for (const suiteName of ["public", "hidden", "metamorphic", "generated"]) {
       const suite = asRecord(tests[suiteName]);
-      if (!suite || !Array.isArray(suite.files)) {
+      if (!(suite && Array.isArray(suite.files))) {
         continue;
       }
 
@@ -180,11 +206,18 @@ function validateReferencedFiles(ctx: ValidationContext, task: Record<string, un
 
   const referenceSolution = asRecord(task.reference_solution);
   if (referenceSolution && typeof referenceSolution.path === "string") {
-    assertExistingDirectory(ctx, "reference_solution.path", referenceSolution.path);
+    assertExistingDirectory(
+      ctx,
+      "reference_solution.path",
+      referenceSolution.path
+    );
   }
 }
 
-function validateTestWeights(ctx: ValidationContext, task: Record<string, unknown>): void {
+function validateTestWeights(
+  ctx: ValidationContext,
+  task: Record<string, unknown>
+): void {
   const tests = asRecord(task.tests);
   if (!tests) {
     return;
@@ -204,107 +237,165 @@ function validateTestWeights(ctx: ValidationContext, task: Record<string, unknow
 
   const sum = weights.reduce((total, weight) => total + weight, 0);
   if (!almostEqual(sum, 1)) {
-    ctx.errors.push(`tests: suite weights must sum to 1.0, got ${formatNumber(sum)}`);
+    ctx.errors.push(
+      `tests: suite weights must sum to 1.0, got ${formatNumber(sum)}`
+    );
   }
 }
 
-function validateScoringWeights(ctx: ValidationContext, task: Record<string, unknown>): void {
+function validateScoringWeights(
+  ctx: ValidationContext,
+  task: Record<string, unknown>
+): void {
   const scoring = asRecord(task.scoring);
   const weights = asRecord(scoring?.weights);
   if (!weights) {
     return;
   }
 
-  const values = Object.values(weights).filter((value): value is number => typeof value === "number");
+  const values = Object.values(weights).filter(
+    (value): value is number => typeof value === "number"
+  );
   if (values.length === 0) {
     return;
   }
 
   const sum = values.reduce((total, weight) => total + weight, 0);
   if (!almostEqual(sum, 1)) {
-    ctx.errors.push(`scoring.weights: weights must sum to 1.0, got ${formatNumber(sum)}`);
+    ctx.errors.push(
+      `scoring.weights: weights must sum to 1.0, got ${formatNumber(sum)}`
+    );
   }
 }
 
-function validateGeneratedProvenance(ctx: ValidationContext, task: Record<string, unknown>): void {
+function validateGeneratedProvenance(
+  ctx: ValidationContext,
+  task: Record<string, unknown>
+): void {
   const provenance = asRecord(task.provenance);
-  if (!provenance || provenance.source !== "generated") {
+  if (provenance?.source !== "generated") {
     return;
   }
 
   if (!isRecord(provenance.generator)) {
-    ctx.errors.push("provenance.generator: generated tasks must include generator metadata");
+    ctx.errors.push(
+      "provenance.generator: generated tasks must include generator metadata"
+    );
   }
 }
 
-function assertExistingFile(ctx: ValidationContext, field: string, relativePath: string): void {
+function assertExistingFile(
+  ctx: ValidationContext,
+  field: string,
+  relativePath: string
+): void {
   const path = resolveTaskPath(ctx, field, relativePath);
   if (!path) {
     return;
   }
 
-  if (!existsSync(path) || !statSync(path).isFile()) {
-    ctx.errors.push(`${field}: referenced file does not exist: ${relativePath}`);
+  if (!(existsSync(path) && statSync(path).isFile())) {
+    ctx.errors.push(
+      `${field}: referenced file does not exist: ${relativePath}`
+    );
   }
 }
 
-function assertExistingDirectory(ctx: ValidationContext, field: string, relativePath: string): void {
+function assertExistingDirectory(
+  ctx: ValidationContext,
+  field: string,
+  relativePath: string
+): void {
   const path = resolveTaskPath(ctx, field, relativePath);
   if (!path) {
     return;
   }
 
-  if (!existsSync(path) || !statSync(path).isDirectory()) {
-    ctx.errors.push(`${field}: referenced directory does not exist: ${relativePath}`);
+  if (!(existsSync(path) && statSync(path).isDirectory())) {
+    ctx.errors.push(
+      `${field}: referenced directory does not exist: ${relativePath}`
+    );
   }
 }
 
-function resolveTaskPath(ctx: ValidationContext, field: string, path: string): string | undefined {
+function resolveTaskPath(
+  ctx: ValidationContext,
+  field: string,
+  path: string
+): string | undefined {
   if (isAbsolute(path)) {
     ctx.errors.push(`${field}: path must be relative: ${path}`);
-    return undefined;
+    return;
   }
 
   const resolved = resolve(ctx.taskDir, path);
   const fromTaskRoot = relative(ctx.taskDir, resolved);
   if (fromTaskRoot.startsWith("..") || isAbsolute(fromTaskRoot)) {
     ctx.errors.push(`${field}: path escapes task directory: ${path}`);
-    return undefined;
+    return;
   }
 
   return resolved;
 }
 
-function validateSchema(value: unknown, currentSchema: JsonSchema, path: string, rootSchema: JsonSchema): string[] {
+function validateSchema(
+  value: unknown,
+  currentSchema: JsonSchema,
+  path: string,
+  rootSchema: JsonSchema
+): string[] {
   if (currentSchema.$ref) {
-    return validateSchema(value, resolveRef(rootSchema, currentSchema.$ref), path, rootSchema);
+    return validateSchema(
+      value,
+      resolveRef(rootSchema, currentSchema.$ref),
+      path,
+      rootSchema
+    );
   }
 
   const errors: string[] = [];
 
   if (currentSchema.const !== undefined && value !== currentSchema.const) {
-    errors.push(`${path}: expected constant ${JSON.stringify(currentSchema.const)}`);
+    errors.push(
+      `${path}: expected constant ${JSON.stringify(currentSchema.const)}`
+    );
     return errors;
   }
 
-  if (currentSchema.enum && !currentSchema.enum.some((candidate) => candidate === value)) {
-    errors.push(`${path}: expected one of ${currentSchema.enum.map((item) => JSON.stringify(item)).join(", ")}`);
+  if (
+    currentSchema.enum &&
+    !currentSchema.enum.some((candidate) => candidate === value)
+  ) {
+    errors.push(
+      `${path}: expected one of ${currentSchema.enum.map((item) => JSON.stringify(item)).join(", ")}`
+    );
     return errors;
   }
 
   if (currentSchema.type && !matchesType(value, currentSchema.type)) {
-    errors.push(`${path}: expected type ${Array.isArray(currentSchema.type) ? currentSchema.type.join(" or ") : currentSchema.type}`);
+    errors.push(
+      `${path}: expected type ${Array.isArray(currentSchema.type) ? currentSchema.type.join(" or ") : currentSchema.type}`
+    );
     return errors;
   }
 
   if (typeof value === "string") {
-    if (currentSchema.minLength !== undefined && value.length < currentSchema.minLength) {
+    if (
+      currentSchema.minLength !== undefined &&
+      value.length < currentSchema.minLength
+    ) {
       errors.push(`${path}: expected length >= ${currentSchema.minLength}`);
     }
-    if (currentSchema.maxLength !== undefined && value.length > currentSchema.maxLength) {
+    if (
+      currentSchema.maxLength !== undefined &&
+      value.length > currentSchema.maxLength
+    ) {
       errors.push(`${path}: expected length <= ${currentSchema.maxLength}`);
     }
-    if (currentSchema.pattern && !new RegExp(currentSchema.pattern).test(value)) {
+    if (
+      currentSchema.pattern &&
+      !new RegExp(currentSchema.pattern).test(value)
+    ) {
       errors.push(`${path}: does not match pattern ${currentSchema.pattern}`);
     }
   }
@@ -319,18 +410,34 @@ function validateSchema(value: unknown, currentSchema: JsonSchema, path: string,
   }
 
   if (Array.isArray(value)) {
-    if (currentSchema.minItems !== undefined && value.length < currentSchema.minItems) {
-      errors.push(`${path}: expected at least ${currentSchema.minItems} item(s)`);
+    if (
+      currentSchema.minItems !== undefined &&
+      value.length < currentSchema.minItems
+    ) {
+      errors.push(
+        `${path}: expected at least ${currentSchema.minItems} item(s)`
+      );
     }
-    if (currentSchema.maxItems !== undefined && value.length > currentSchema.maxItems) {
-      errors.push(`${path}: expected at most ${currentSchema.maxItems} item(s)`);
+    if (
+      currentSchema.maxItems !== undefined &&
+      value.length > currentSchema.maxItems
+    ) {
+      errors.push(
+        `${path}: expected at most ${currentSchema.maxItems} item(s)`
+      );
     }
-    if (currentSchema.uniqueItems && new Set(value.map((item) => JSON.stringify(item))).size !== value.length) {
+    if (
+      currentSchema.uniqueItems &&
+      new Set(value.map((item) => JSON.stringify(item))).size !== value.length
+    ) {
       errors.push(`${path}: expected unique items`);
     }
-    if (currentSchema.items) {
+    const itemSchema = currentSchema.items;
+    if (itemSchema) {
       value.forEach((item, index) => {
-        errors.push(...validateSchema(item, currentSchema.items!, `${path}[${index}]`, rootSchema));
+        errors.push(
+          ...validateSchema(item, itemSchema, `${path}[${index}]`, rootSchema)
+        );
       });
     }
   }
@@ -348,7 +455,14 @@ function validateSchema(value: unknown, currentSchema: JsonSchema, path: string,
     for (const [key, childValue] of Object.entries(value)) {
       const propertySchema = properties[key];
       if (propertySchema) {
-        errors.push(...validateSchema(childValue, propertySchema, `${path}.${key}`, rootSchema));
+        errors.push(
+          ...validateSchema(
+            childValue,
+            propertySchema,
+            `${path}.${key}`,
+            rootSchema
+          )
+        );
         continue;
       }
 
@@ -358,7 +472,14 @@ function validateSchema(value: unknown, currentSchema: JsonSchema, path: string,
 
       if (matchedPatternSchemas.length > 0) {
         for (const patternSchema of matchedPatternSchemas) {
-          errors.push(...validateSchema(childValue, patternSchema, `${path}.${key}`, rootSchema));
+          errors.push(
+            ...validateSchema(
+              childValue,
+              patternSchema,
+              `${path}.${key}`,
+              rootSchema
+            )
+          );
         }
         continue;
       }
@@ -366,7 +487,14 @@ function validateSchema(value: unknown, currentSchema: JsonSchema, path: string,
       if (currentSchema.additionalProperties === false) {
         errors.push(`${path}.${key}: unknown property`);
       } else if (isRecord(currentSchema.additionalProperties)) {
-        errors.push(...validateSchema(childValue, currentSchema.additionalProperties, `${path}.${key}`, rootSchema));
+        errors.push(
+          ...validateSchema(
+            childValue,
+            currentSchema.additionalProperties,
+            `${path}.${key}`,
+            rootSchema
+          )
+        );
       }
     }
   }
@@ -379,11 +507,14 @@ function resolveRef(rootSchema: JsonSchema, ref: string): JsonSchema {
     throw new Error(`Unsupported schema ref: ${ref}`);
   }
 
-  const parts = ref.slice(2).split("/").map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~"));
+  const parts = ref
+    .slice(2)
+    .split("/")
+    .map((part) => part.replace(/~1/g, "/").replace(/~0/g, "~"));
   let current: unknown = rootSchema;
 
   for (const part of parts) {
-    if (!isRecord(current) || !(part in current)) {
+    if (!(isRecord(current) && part in current)) {
       throw new Error(`Unresolvable schema ref: ${ref}`);
     }
     current = current[part];
@@ -397,7 +528,9 @@ function resolveRef(rootSchema: JsonSchema, ref: string): JsonSchema {
 }
 
 function matchesType(value: unknown, expectedType: string | string[]): boolean {
-  const expectedTypes = Array.isArray(expectedType) ? expectedType : [expectedType];
+  const expectedTypes = Array.isArray(expectedType)
+    ? expectedType
+    : [expectedType];
   return expectedTypes.some((type) => {
     switch (type) {
       case "array":
@@ -433,7 +566,12 @@ function almostEqual(left: number, right: number): boolean {
 }
 
 function formatNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(12).replace(/0+$/, "").replace(/\.$/, "");
+  return Number.isInteger(value)
+    ? String(value)
+    : value
+        .toFixed(12)
+        .replace(TRAILING_ZEROS_RE, "")
+        .replace(TRAILING_DOT_RE, "");
 }
 
 function printResult(result: ValidationResult): void {

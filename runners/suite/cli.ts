@@ -65,12 +65,14 @@ export function parseArgs(argv: string[]): {
     throw new Error(USAGE);
   }
 
-  if (!agentId || (!tasksPattern && !failedFrom)) {
+  if (!(agentId && (tasksPattern || failedFrom))) {
     throw new Error(USAGE);
   }
 
   if (!SUPPORTED_AGENTS.includes(agentId)) {
-    throw new Error(`unknown agent: ${agentId}; supported agents: ${SUPPORTED_AGENTS.join(", ")}`);
+    throw new Error(
+      `unknown agent: ${agentId}; supported agents: ${SUPPORTED_AGENTS.join(", ")}`
+    );
   }
 
   return { agentId, tasksPattern, failedFrom, concurrency };

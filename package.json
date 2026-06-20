@@ -1,14 +1,16 @@
 {
-  "name": "bun-server-bench",
-  "private": true,
-  "type": "module",
   "devDependencies": {
+    "@biomejs/biome": "2.4.16",
     "@commitlint/cli": "21.0.1",
     "@release-it/conventional-changelog": "11.0.1",
     "@types/bun": "latest",
+    "lefthook": "2.1.9",
+    "prettier": "3.8.4",
     "release-it": "20.2.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "ultracite": "7.8.3"
   },
+  "name": "bun-server-bench",
   "scripts": {
     "test": "bun test runners",
     "validate": "bun run validate:tasks",
@@ -34,6 +36,14 @@
     "release:github": "release-it --no-increment --ci",
     "release:github:dry-run": "release-it --no-increment --ci --dry-run",
     "release:harbor": "bun scripts/release/publish-harbor.ts",
-    "release:huggingface": "bun scripts/release/publish-huggingface.ts"
-  }
+    "release:huggingface": "bun scripts/release/publish-huggingface.ts",
+    "check": "ultracite check",
+    "fix": "ultracite fix",
+    "format:md": "prettier --write \"**/*.md\"",
+    "format": "ultracite fix && prettier --write \"**/*.md\"",
+    "lint": "ultracite check && prettier --check \"**/*.md\"",
+    "prepare": "lefthook install"
+  },
+  "type": "module",
+  "private": true
 }

@@ -2,15 +2,18 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TaskConfig } from "../local/types";
 
-type InstructionConfig = {
+interface InstructionConfig {
+  allowed_assumptions?: string[];
+  constraints?: string[];
+  disallowed_shortcuts?: string[];
   prompt_file: string;
   summary?: string;
-  constraints?: string[];
-  allowed_assumptions?: string[];
-  disallowed_shortcuts?: string[];
-};
+}
 
-export function constructPrompt(taskDir: string, task: TaskConfig & { instruction?: InstructionConfig }): string {
+export function constructPrompt(
+  taskDir: string,
+  task: TaskConfig & { instruction?: InstructionConfig }
+): string {
   const promptFile = task.instruction?.prompt_file ?? "prompt.md";
   const promptPath = join(taskDir, promptFile);
   const basePrompt = readFileSync(promptPath, "utf8").trimEnd();
@@ -31,11 +34,15 @@ export function constructPrompt(taskDir: string, task: TaskConfig & { instructio
   }
 
   if (instruction.allowed_assumptions?.length) {
-    sections.push(formatBullets("Allowed assumptions", instruction.allowed_assumptions));
+    sections.push(
+      formatBullets("Allowed assumptions", instruction.allowed_assumptions)
+    );
   }
 
   if (instruction.disallowed_shortcuts?.length) {
-    sections.push(formatBullets("Disallowed shortcuts", instruction.disallowed_shortcuts));
+    sections.push(
+      formatBullets("Disallowed shortcuts", instruction.disallowed_shortcuts)
+    );
   }
 
   return `${sections.join("\n\n")}\n`;

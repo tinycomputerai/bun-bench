@@ -1,39 +1,11 @@
-import type { PhaseOutcome, RunStatus } from "../local/types";
-import { computeScore } from "../local/result";
 import type { AgentMetrics } from "../../agents/types";
+import { computeScore } from "../local/result";
+import type { PhaseOutcome, RunStatus } from "../local/types";
 
 export type AgentRunStatus = RunStatus | "failed_agent";
 
-export type AgentRunResult = {
-  task_id: string;
-  task_version: string;
-  spec_version: string;
-  run_id: string;
+export interface AgentRunResult {
   agent_id: string;
-  mode: "agent";
-  status: AgentRunStatus;
-  score: number;
-  max_score: number;
-  started_at: string;
-  completed_at: string;
-  durations: {
-    agent_ms: number;
-    install_ms: number;
-    start_ms: number;
-    readiness_ms: number;
-    public_tests_ms: number;
-    hidden_tests_ms: number;
-    total_ms: number;
-  };
-  outcome: {
-    agent: PhaseOutcome;
-    install: PhaseOutcome;
-    start: PhaseOutcome;
-    readiness: PhaseOutcome;
-    public_tests: PhaseOutcome;
-    hidden_tests: PhaseOutcome;
-  };
-  metrics: AgentMetrics;
   artifacts: {
     agent_prompt: string;
     agent_stdout: string;
@@ -47,8 +19,36 @@ export type AgentRunResult = {
     hidden_tests_stdout: string;
     hidden_tests_stderr: string;
   };
+  completed_at: string;
+  durations: {
+    agent_ms: number;
+    install_ms: number;
+    start_ms: number;
+    readiness_ms: number;
+    public_tests_ms: number;
+    hidden_tests_ms: number;
+    total_ms: number;
+  };
   error: string | null;
-};
+  max_score: number;
+  metrics: AgentMetrics;
+  mode: "agent";
+  outcome: {
+    agent: PhaseOutcome;
+    install: PhaseOutcome;
+    start: PhaseOutcome;
+    readiness: PhaseOutcome;
+    public_tests: PhaseOutcome;
+    hidden_tests: PhaseOutcome;
+  };
+  run_id: string;
+  score: number;
+  spec_version: string;
+  started_at: string;
+  status: AgentRunStatus;
+  task_id: string;
+  task_version: string;
+}
 
 export function buildAgentResult(options: {
   taskId: string;
@@ -110,7 +110,7 @@ export function skippedAgentOutcomes(): AgentRunResult["outcome"] {
 
 export function markSkippedAfterAgent(
   outcome: AgentRunResult["outcome"],
-  failedPhase: keyof AgentRunResult["outcome"],
+  failedPhase: keyof AgentRunResult["outcome"]
 ): AgentRunResult["outcome"] {
   const order: Array<keyof AgentRunResult["outcome"]> = [
     "agent",

@@ -1,0 +1,18 @@
+# Prettier formats Markdown only. Ignore deps, lockfiles, and everything Biome
+# owns or that is generated / benchmark content.
+node_modules
+bun.lock
+dist
+release-assets
+
+# Run/data outputs
+runs
+results
+jobs
+datasets
+
+# Benchmark content (agent-visible) and generated Harbor projection — never
+# reformat: it would change task source and invalidate committed exports.
+tasks
+harbor
+.chunks

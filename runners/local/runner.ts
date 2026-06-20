@@ -1,17 +1,17 @@
 import { writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { validateTaskDirectory } from "../../validators/validate-task";
-import {
-  buildResult,
-  skippedOutcomes,
-} from "./result";
+import { runValidationLifecycle } from "../shared/validation";
+import { buildResult, skippedOutcomes } from "./result";
 import type { RunMode, RunResult, TaskConfig } from "./types";
 import { createRunDirectory, materializeWorkspace } from "./workspace";
-import { runValidationLifecycle } from "../shared/validation";
 
 const repoRoot = resolve(import.meta.dir, "../..");
 
-export async function runTask(taskPath: string, mode: RunMode): Promise<RunResult> {
+export async function runTask(
+  taskPath: string,
+  mode: RunMode
+): Promise<RunResult> {
   const startedAt = new Date().toISOString();
   const runStartedMs = Date.now();
   const taskDir = resolve(process.cwd(), taskPath);
@@ -87,11 +87,16 @@ async function loadTaskConfig(taskDir: string): Promise<TaskConfig> {
 
 function relativeToCwd(absolutePath: string): string {
   const cwd = process.cwd();
-  return absolutePath.startsWith(`${cwd}/`) ? absolutePath.slice(cwd.length + 1) : absolutePath;
+  return absolutePath.startsWith(`${cwd}/`)
+    ? absolutePath.slice(cwd.length + 1)
+    : absolutePath;
 }
 
 function writeResult(runDir: string, result: RunResult): void {
-  writeFileSync(join(runDir, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
+  writeFileSync(
+    join(runDir, "result.json"),
+    `${JSON.stringify(result, null, 2)}\n`
+  );
 }
 
 function emptyDurations(totalMs: number): RunResult["durations"] {

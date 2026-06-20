@@ -21,7 +21,7 @@ function parseArgs(argv: string[]): { taskPath: string; outRoot: string } {
       index += 1;
       continue;
     }
-    if (!taskPath && !arg.startsWith("-")) {
+    if (!(taskPath || arg.startsWith("-"))) {
       taskPath = arg;
       continue;
     }
@@ -44,7 +44,9 @@ async function main(): Promise<void> {
   console.log(`exported ${result.id}`);
   console.log(`  harbor name: ${result.harborName}`);
   console.log(`  package:     ${result.outDir}`);
-  console.log(`\nrun it with:\n  harbor run -p ${result.outDir} --agent oracle -e docker -y`);
+  console.log(
+    `\nrun it with:\n  harbor run -p ${result.outDir} --agent oracle -e docker -y`
+  );
 }
 
 main().catch((error) => {

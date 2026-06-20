@@ -15,7 +15,7 @@ export function createAgent(agentId: string): Agent {
   const factory = AGENTS[agentId];
   if (!factory) {
     throw new Error(
-      `unknown agent: ${agentId}; supported agents: ${SUPPORTED_AGENTS.join(", ")}`,
+      `unknown agent: ${agentId}; supported agents: ${SUPPORTED_AGENTS.join(", ")}`
     );
   }
   return factory();

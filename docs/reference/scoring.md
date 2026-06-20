@@ -10,11 +10,11 @@ so a number on a leaderboard is never ambiguous.
 Every score today comes from a three-level gate. A run earns exactly one of
 three values:
 
-| Outcome | Score | Harbor `reward.txt` |
-| --- | ---: | ---: |
-| Public **and** hidden tests pass | 100 | `1.0` |
-| Public tests pass, hidden tests fail | 25 | `0.25` |
-| Public tests fail, or install / start / readiness / timeout fails | 0 | `0.0` |
+| Outcome                                                           | Score | Harbor `reward.txt` |
+| ----------------------------------------------------------------- | ----: | ------------------: |
+| Public **and** hidden tests pass                                  |   100 |               `1.0` |
+| Public tests pass, hidden tests fail                              |    25 |              `0.25` |
+| Public tests fail, or install / start / readiness / timeout fails |     0 |               `0.0` |
 
 There is no partial credit within a gate. A task is either fully correct,
 visibly-but-not-deeply correct, or not runnable.

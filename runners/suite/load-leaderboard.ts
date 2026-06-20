@@ -38,20 +38,23 @@ export function selectFailedTaskIds(leaderboard: SuiteLeaderboard): string[] {
 
 export function selectRetryTaskIds(
   leaderboard: SuiteLeaderboard,
-  allTaskIds: string[],
+  allTaskIds: string[]
 ): string[] {
   const failed = selectFailedTaskIds(leaderboard);
   const present = new Set(leaderboard.entries.map((entry) => entry.task_id));
   const pending = allTaskIds.filter((taskId) => !present.has(taskId));
-  return [...failed, ...pending].sort((left, right) => left.localeCompare(right));
+  return [...failed, ...pending].sort((left, right) =>
+    left.localeCompare(right)
+  );
 }
 
 export function mergeLeaderboardEntries(
   previous: SuiteLeaderboard["entries"],
-  retried: SuiteLeaderboard["entries"],
+  retried: SuiteLeaderboard["entries"]
 ): SuiteLeaderboard["entries"] {
   const kept = previous.filter((entry) => entry.score >= 100);
   return [...kept, ...retried].sort(
-    (left, right) => right.score - left.score || left.task_id.localeCompare(right.task_id),
+    (left, right) =>
+      right.score - left.score || left.task_id.localeCompare(right.task_id)
   );
 }

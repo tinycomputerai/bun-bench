@@ -1,5 +1,5 @@
-import { createServer } from "node:net";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import type { CommandResult } from "./types";
 
@@ -26,12 +26,13 @@ export async function runShellCommand(options: {
   const stderrDone = pipeToFile(proc.stderr, options.stderrPath);
 
   let timedOut = false;
-  const timeout = options.timeoutMs > 0
-    ? setTimeout(() => {
-        timedOut = true;
-        proc.kill();
-      }, options.timeoutMs)
-    : undefined;
+  const timeout =
+    options.timeoutMs > 0
+      ? setTimeout(() => {
+          timedOut = true;
+          proc.kill();
+        }, options.timeoutMs)
+      : undefined;
 
   const exitCode = await proc.exited;
   if (timeout) {
@@ -47,14 +48,14 @@ export async function runShellCommand(options: {
   };
 }
 
-export type ManagedProcess = {
-  proc: Bun.Subprocess<"pipe", "pipe", "pipe">;
+export interface ManagedProcess {
   port: number;
-  stdoutPath: string;
-  stderrPath: string;
+  proc: Bun.Subprocess<"pipe", "pipe", "pipe">;
   start(): Promise<void>;
+  stderrPath: string;
+  stdoutPath: string;
   stop(): Promise<void>;
-};
+}
 
 export async function startManagedProcess(options: {
   command: string;
@@ -79,9 +80,11 @@ export async function startManagedProcess(options: {
     port,
     stdoutPath: options.stdoutPath,
     stderrPath: options.stderrPath,
-    async start() {
-      void pipeToFile(proc.stdout, options.stdoutPath);
-      void pipeToFile(proc.stderr, options.stderrPath);
+    start() {
+      // Fire-and-forget: stream stdout/stderr to disk without blocking startup.
+      pipeToFile(proc.stdout, options.stdoutPath).catch(() => undefined);
+      pipeToFile(proc.stderr, options.stderrPath).catch(() => undefined);
+      return Promise.resolve();
     },
     async stop() {
       if (proc.exitCode === null) {
@@ -101,7 +104,10 @@ export async function waitForHttpReadiness(options: {
   expectedStatus: number;
   timeoutMs: number;
   process: ManagedProcess;
-}): Promise<{ ok: true; durationMs: number } | { ok: false; reason: "exited" | "timeout"; durationMs: number }> {
+}): Promise<
+  | { ok: true; durationMs: number }
+  | { ok: false; reason: "exited" | "timeout"; durationMs: number }
+> {
   const started = Date.now();
   const url = `http://127.0.0.1:${options.port}${options.path}`;
 
@@ -137,7 +143,7 @@ function prepareLogFiles(stdoutPath: string, stderrPath: string): void {
 
 async function pipeToFile(
   stream: ReadableStream<Uint8Array> | null,
-  filePath: string,
+  filePath: string
 ): Promise<void> {
   if (!stream) {
     return;

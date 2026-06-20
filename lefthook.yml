@@ -1,0 +1,15 @@
+# Git hooks. On commit, lint + format staged files and re-stage the fixes.
+#   - Biome handles TS/JS/JSON (it ignores tasks/, harbor/, and generated dirs
+#     per biome.jsonc, so staged benchmark/generated files are skipped).
+#   - Prettier handles Markdown (it respects .prettierignore).
+pre-commit:
+  parallel: true
+  jobs:
+    - name: biome
+      glob: "*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc}"
+      run: bunx biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+    - name: prettier
+      glob: "*.md"
+      run: bunx prettier --write --ignore-unknown {staged_files}
+      stage_fixed: true

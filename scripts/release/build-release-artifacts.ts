@@ -1,6 +1,5 @@
 import { cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { assertReleaseAssets } from "./release-assets";
 import { DATASET_CARD_FILE, renderDatasetCard } from "./dataset-card";
 import { parseReleaseArgs, releaseVersionFromTag, usage } from "./parse-args";
 import {
@@ -10,13 +9,9 @@ import {
   TARBALL_EXCLUDE_DIRS,
   TARBALL_INCLUDE_PATHS,
 } from "./paths";
+import { assertReleaseAssets } from "./release-assets";
 
-type Manifest = {
-  name: "bun-server-bench";
-  tag: string;
-  version: string;
-  git_sha: string;
-  created_at: string;
+interface Manifest {
   artifacts: {
     tarball: string;
     sft: string;
@@ -28,7 +23,12 @@ type Manifest = {
     patch_records: number;
     harbor_tasks: number;
   };
-};
+  created_at: string;
+  git_sha: string;
+  name: "bun-server-bench";
+  tag: string;
+  version: string;
+}
 
 function countJsonlRecords(filePath: string): number {
   if (!existsSync(filePath)) {
@@ -49,7 +49,12 @@ function countHarborTasks(root: string): number {
     return 0;
   }
 
-  return [...new Bun.Glob("*/task.toml").scanSync({ cwd: harborRoot, onlyFiles: true })].length;
+  return [
+    ...new Bun.Glob("*/task.toml").scanSync({
+      cwd: harborRoot,
+      onlyFiles: true,
+    }),
+  ].length;
 }
 
 function resolveGitSha(root: string): string {
@@ -69,7 +74,7 @@ function resolveGitSha(root: string): string {
 async function createTarball(
   root: string,
   outputPath: string,
-  includePaths: readonly string[],
+  includePaths: readonly string[]
 ): Promise<void> {
   const args = ["-czf", outputPath];
 
@@ -94,7 +99,7 @@ async function createTarball(
 }
 
 async function main(): Promise<void> {
-  let options;
+  let options: ReturnType<typeof parseReleaseArgs>;
   try {
     options = parseReleaseArgs(process.argv.slice(2));
   } catch (error) {
@@ -104,7 +109,7 @@ async function main(): Promise<void> {
   }
 
   const root = repoRoot();
-  let assets;
+  let assets: ReturnType<typeof assertReleaseAssets>;
   try {
     assets = assertReleaseAssets(root);
   } catch (error) {

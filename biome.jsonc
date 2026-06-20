@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/biome/core"],
+  "files": {
+    "includes": [
+      "!**/node_modules",
+      "!bun.lock",
+      // Markdown is handled by Prettier.
+      "!**/*.md",
+      // Benchmark content — never reformat (changes agent-visible task source
+      // and would invalidate the committed Harbor exports / digests).
+      "!tasks",
+      // Generated artifacts and run/data outputs.
+      "!harbor",
+      "!.chunks",
+      "!runs",
+      "!results",
+      "!jobs",
+      "!datasets",
+      "!dist",
+      "!release-assets",
+      // Export test fixtures contain intentional sample code.
+      "!**/fixtures"
+    ]
+  },
+  "javascript": {
+    "globals": ["Bun"]
+  },
+  "linter": {
+    "rules": {
+      "complexity": {
+        // The task validator and the diff builder are intentionally branchy;
+        // this subjective heuristic isn't worth refactoring tested logic for.
+        "noExcessiveCognitiveComplexity": "off"
+      }
+    }
+  }
+}

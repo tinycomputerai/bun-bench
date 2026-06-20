@@ -1,12 +1,18 @@
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { parseReleaseArgs, usage } from "./parse-args";
-import { HF_DATASET_REPO, hfStagingPaths, releaseAssetPaths, releaseAssetsDir, repoRoot } from "./paths";
+import {
+  HF_DATASET_REPO,
+  hfStagingPaths,
+  releaseAssetPaths,
+  releaseAssetsDir,
+  repoRoot,
+} from "./paths";
 
-type DownloadSpec = {
-  remotePath: string;
+interface DownloadSpec {
   localPath: string;
-};
+  remotePath: string;
+}
 
 function buildDownloadSpecs(tag: string): DownloadSpec[] {
   const staging = hfStagingPaths(tag);
@@ -30,7 +36,7 @@ function buildDownloadCommand(spec: DownloadSpec, tempDir: string): string[] {
   ];
 }
 
-async function ensureHuggingfaceCli(): Promise<void> {
+function ensureHuggingfaceCli(): void {
   const check = Bun.spawnSync(["huggingface-cli", "--help"], {
     stdout: "ignore",
     stderr: "ignore",
@@ -40,17 +46,23 @@ async function ensureHuggingfaceCli(): Promise<void> {
     return;
   }
 
-  const install = Bun.spawnSync(["python3", "-m", "pip", "install", "--quiet", "huggingface_hub"], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
+  const install = Bun.spawnSync(
+    ["python3", "-m", "pip", "install", "--quiet", "huggingface_hub"],
+    {
+      stdout: "inherit",
+      stderr: "inherit",
+    }
+  );
 
   if (install.exitCode !== 0) {
     throw new Error("failed to install huggingface_hub (huggingface-cli)");
   }
 }
 
-async function downloadFile(spec: DownloadSpec, tempDir: string): Promise<void> {
+async function downloadFile(
+  spec: DownloadSpec,
+  tempDir: string
+): Promise<void> {
   const token = process.env.HF_TOKEN?.trim();
   if (!token) {
     throw new Error("HF_TOKEN is required to fetch staged release assets");
@@ -81,7 +93,7 @@ async function downloadFile(spec: DownloadSpec, tempDir: string): Promise<void> 
 }
 
 async function main(): Promise<void> {
-  let options;
+  let options: ReturnType<typeof parseReleaseArgs>;
   try {
     options = parseReleaseArgs(process.argv.slice(2));
   } catch (error) {
@@ -98,7 +110,7 @@ async function main(): Promise<void> {
     console.log("[release:fetch-staging] dry run — would run:");
     for (const spec of specs) {
       console.log(
-        `  HF_TOKEN=*** huggingface-cli download ${HF_DATASET_REPO} ${spec.remotePath} --repo-type dataset --local-dir ${tempDir}`,
+        `  HF_TOKEN=*** huggingface-cli download ${HF_DATASET_REPO} ${spec.remotePath} --repo-type dataset --local-dir ${tempDir}`
       );
       console.log(`  cp ${join(tempDir, spec.remotePath)} ${spec.localPath}`);
     }
@@ -116,7 +128,9 @@ async function main(): Promise<void> {
     rmSync(tempDir, { recursive: true, force: true });
   }
 
-  console.log(`[release:fetch-staging] fetched staged release assets for ${options.tag}`);
+  console.log(
+    `[release:fetch-staging] fetched staged release assets for ${options.tag}`
+  );
   for (const spec of specs) {
     console.log(`  ${spec.localPath}`);
   }

@@ -1,7 +1,16 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { constructPrompt } from "../agent/prompt";
 import { validateTaskDirectory } from "../../validators/validate-task";
+import { constructPrompt } from "../agent/prompt";
 
 /**
  * Harbor export adapter.
@@ -28,23 +37,27 @@ import { validateTaskDirectory } from "../../validators/validate-task";
  *     solve.sh                Oracle: writes the reference solution into /app
  */
 
-export type ExportResult = {
-  id: string;
+export interface ExportResult {
   harborName: string;
+  id: string;
   outDir: string;
-};
+}
 
 const HARBOR_SCHEMA_VERSION = "1.3";
 const BUN_IMAGE = "oven/bun:1";
 const SOLUTION_HEREDOC = "BUN_SERVER_BENCH_SOLUTION_EOF";
+const OPTIONAL_TRAILING_NEWLINE_RE = /\n?$/;
 
-export async function exportTask(taskDirInput: string, outRoot: string): Promise<ExportResult> {
+export async function exportTask(
+  taskDirInput: string,
+  outRoot: string
+): Promise<ExportResult> {
   const taskDir = resolve(process.cwd(), taskDirInput);
 
   const validation = await validateTaskDirectory(relativeToCwd(taskDir));
   if (validation.errors.length > 0) {
     throw new Error(
-      `cannot export invalid task ${taskDirInput}:\n  - ${validation.errors.join("\n  - ")}`,
+      `cannot export invalid task ${taskDirInput}:\n  - ${validation.errors.join("\n  - ")}`
     );
   }
 
@@ -59,9 +72,15 @@ export async function exportTask(taskDirInput: string, outRoot: string): Promise
   mkdirSync(join(outDir, "solution"), { recursive: true });
 
   writeFileSync(join(outDir, "task.toml"), renderTaskToml(task, harborName));
-  writeFileSync(join(outDir, "instruction.md"), constructPrompt(taskDir, task as never));
+  writeFileSync(
+    join(outDir, "instruction.md"),
+    constructPrompt(taskDir, task as never)
+  );
   writeFileSync(join(outDir, "README.md"), renderReadme(task));
-  writeFileSync(join(outDir, "bun-server-bench.meta.json"), `${JSON.stringify(buildMeta(task), null, 2)}\n`);
+  writeFileSync(
+    join(outDir, "bun-server-bench.meta.json"),
+    `${JSON.stringify(buildMeta(task), null, 2)}\n`
+  );
   writeFileSync(join(outDir, ".gitignore"), HARBOR_GITIGNORE);
 
   writeEnvironment(taskDir, outDir);
@@ -156,7 +175,9 @@ function writeSolution(taskDir: string, outDir: string): void {
   }));
 
   if (files.length === 0) {
-    throw new Error(`reference solution has no files under solutions/reference/src for ${taskDir}`);
+    throw new Error(
+      `reference solution has no files under solutions/reference/src for ${taskDir}`
+    );
   }
 
   writeFileSync(join(outDir, "solution", "solve.sh"), renderSolveSh(files));
@@ -164,10 +185,12 @@ function writeSolution(taskDir: string, outDir: string): void {
 
 function renderSolveSh(files: Array<{ rel: string; content: string }>): string {
   const blocks = files.map((file) => {
-    const dir = file.rel.includes("/") ? file.rel.slice(0, file.rel.lastIndexOf("/")) : "";
+    const dir = file.rel.includes("/")
+      ? file.rel.slice(0, file.rel.lastIndexOf("/"))
+      : "";
     const mkdir = dir ? `mkdir -p /app/src/${dir}\n` : "";
     // Quoted heredoc delimiter => no shell expansion of the embedded source.
-    return `${mkdir}cat > /app/src/${file.rel} <<'${SOLUTION_HEREDOC}'\n${file.content.replace(/\n?$/, "\n")}${SOLUTION_HEREDOC}\n`;
+    return `${mkdir}cat > /app/src/${file.rel} <<'${SOLUTION_HEREDOC}'\n${file.content.replace(OPTIONAL_TRAILING_NEWLINE_RE, "\n")}${SOLUTION_HEREDOC}\n`;
   });
 
   return `#!/usr/bin/env bash
@@ -181,10 +204,16 @@ ${blocks.join("\n")}`;
 
 // --- task.toml ----------------------------------------------------------------
 
-function renderTaskToml(task: Record<string, unknown>, harborName: string): string {
-  const description = String(task.description ?? task.title ?? "").replace(/\s+/g, " ").trim();
+function renderTaskToml(
+  task: Record<string, unknown>,
+  harborName: string
+): string {
+  const description = String(task.description ?? task.title ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
   const difficulty = task.difficulty as { level?: number } | undefined;
-  const level = typeof difficulty?.level === "number" ? difficulty.level : undefined;
+  const level =
+    typeof difficulty?.level === "number" ? difficulty.level : undefined;
   const category = String(task.category ?? "");
   const tags = Array.isArray(task.tags) ? task.tags.map(String) : [];
   const timeouts = (task.timeouts ?? {}) as Record<string, number>;
@@ -199,10 +228,13 @@ function renderTaskToml(task: Record<string, unknown>, harborName: string): stri
     `task_version:${task.task_version}`,
     `spec_version:${task.spec_version}`,
     `category:${category}`,
-    level !== undefined ? `difficulty:${level}` : undefined,
+    level === undefined ? undefined : `difficulty:${level}`,
   ].filter((value): value is string => typeof value === "string");
 
-  const verifierTimeout = Math.max(300, Number(timeouts.test_seconds ?? 120) * 2 + 60);
+  const verifierTimeout = Math.max(
+    300,
+    Number(timeouts.test_seconds ?? 120) * 2 + 60
+  );
   const agentTimeout = Number(timeouts.total_seconds ?? 900);
   const buildTimeout = Math.max(600, Number(timeouts.install_seconds ?? 120));
 
@@ -256,10 +288,17 @@ function buildMeta(task: Record<string, unknown>): Record<string, unknown> {
     tags: task.tags,
     scoring: task.scoring,
     success_criteria: task.success_criteria,
-    environment_network: (task.environment as Record<string, unknown> | undefined)?.network,
+    environment_network: (
+      task.environment as Record<string, unknown> | undefined
+    )?.network,
     reward_model: {
-      description: "Harbor reward.txt is computed by the bun-server-bench gate model in tests/test.sh.",
-      values: { public_and_hidden_pass: 1.0, public_pass_hidden_fail: 0.25, public_fail: 0.0 },
+      description:
+        "Harbor reward.txt is computed by the bun-server-bench gate model in tests/test.sh.",
+      values: {
+        public_and_hidden_pass: 1.0,
+        public_pass_hidden_fail: 0.25,
+        public_fail: 0.0,
+      },
       maps_to_bun_server_bench_score: { "1.0": 100, "0.25": 25, "0.0": 0 },
     },
   };
@@ -283,9 +322,15 @@ Generated by the bun-server-bench Harbor export adapter; do not edit by hand.
 // --- helpers ------------------------------------------------------------------
 
 function harborDifficulty(level: number | undefined): string {
-  if (level === undefined) return "unknown";
-  if (level <= 2) return "easy";
-  if (level === 3) return "medium";
+  if (level === undefined) {
+    return "unknown";
+  }
+  if (level <= 2) {
+    return "easy";
+  }
+  if (level === 3) {
+    return "medium";
+  }
   return "hard";
 }
 
@@ -318,15 +363,21 @@ function copyPublicFixtures(taskDir: string, appDir: string): void {
     return;
   }
   const fixturesDir = join(taskDir, "fixtures");
-  if (!existsSync(fixturesDir)) return;
-  const hasRealFiles = readdirSync(fixturesDir).some((entry) => entry !== ".gitkeep");
+  if (!existsSync(fixturesDir)) {
+    return;
+  }
+  const hasRealFiles = readdirSync(fixturesDir).some(
+    (entry) => entry !== ".gitkeep"
+  );
   if (hasRealFiles) {
     copyDir(fixturesDir, join(appDir, "fixtures"));
   }
 }
 
 function listFilesRecursive(dir: string): string[] {
-  if (!existsSync(dir)) return [];
+  if (!existsSync(dir)) {
+    return [];
+  }
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
@@ -340,7 +391,9 @@ function listFilesRecursive(dir: string): string[] {
 }
 
 function copyFile(source: string, destination: string): void {
-  if (!existsSync(source)) return;
+  if (!existsSync(source)) {
+    return;
+  }
   mkdirSync(resolve(destination, ".."), { recursive: true });
   cpSync(source, destination);
 }
@@ -354,7 +407,9 @@ function copyDir(source: string, destination: string): void {
 
 function relativeToCwd(absolutePath: string): string {
   const cwd = process.cwd();
-  return absolutePath.startsWith(`${cwd}/`) ? absolutePath.slice(cwd.length + 1) : absolutePath;
+  return absolutePath.startsWith(`${cwd}/`)
+    ? absolutePath.slice(cwd.length + 1)
+    : absolutePath;
 }
 
 function tomlString(value: string): string {
@@ -362,7 +417,9 @@ function tomlString(value: string): string {
 }
 
 function tomlStringArray(values: string[]): string {
-  if (values.length === 0) return "[]";
+  if (values.length === 0) {
+    return "[]";
+  }
   return `[${values.map(tomlString).join(", ")}]`;
 }
 

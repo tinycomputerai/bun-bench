@@ -2,19 +2,27 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { constructPrompt } from "../agent/prompt";
 import type { TaskConfig } from "../local/types";
+import {
+  extractSolutionPatch,
+  matchesReferenceSolution,
+} from "./solution-patch";
 import { loadTaskDatasetMetadata, resolveTaskDirectory } from "./task-metadata";
-import { extractSolutionPatch, matchesReferenceSolution } from "./solution-patch";
-import type { DatasetSplit, ExportRunResult, ExportSkipReason, TaskDatasetMetadata } from "./types";
+import type {
+  DatasetSplit,
+  ExportRunResult,
+  ExportSkipReason,
+  TaskDatasetMetadata,
+} from "./types";
 
-export type PreparedRun = {
-  runDir: string;
-  result: ExportRunResult;
-  taskDir: string;
+export interface PreparedRun {
   dataset: TaskDatasetMetadata;
-  prompt: string;
-  patch: string;
   filesChanged: string[];
-};
+  patch: string;
+  prompt: string;
+  result: ExportRunResult;
+  runDir: string;
+  taskDir: string;
+}
 
 export async function prepareRunForExport(
   runDir: string,
@@ -23,8 +31,11 @@ export async function prepareRunForExport(
     allowPublicEval: boolean;
     allowPrivateEval: boolean;
     tasksRoot?: string;
-  },
-): Promise<{ prepared: PreparedRun | null; skipReason: ExportSkipReason | null }> {
+  }
+): Promise<{
+  prepared: PreparedRun | null;
+  skipReason: ExportSkipReason | null;
+}> {
   const resultPath = join(runDir, "result.json");
   if (!existsSync(resultPath)) {
     return { prepared: null, skipReason: "missing_result" };
@@ -79,7 +90,7 @@ export async function prepareRunForExport(
     return { prepared: null, skipReason: "reference_solution" };
   }
 
-  let patchResult;
+  let patchResult: ReturnType<typeof extractSolutionPatch>;
   try {
     patchResult = extractSolutionPatch(taskDir, workspaceDir);
   } catch {
@@ -109,7 +120,10 @@ export async function prepareRunForExport(
   };
 }
 
-async function loadPrompt(runDir: string, taskDir: string): Promise<string | null> {
+async function loadPrompt(
+  runDir: string,
+  taskDir: string
+): Promise<string | null> {
   const promptPath = join(runDir, "logs", "agent-prompt.md");
   if (existsSync(promptPath)) {
     return readFileSync(promptPath, "utf8").trim();
@@ -120,7 +134,9 @@ async function loadPrompt(runDir: string, taskDir: string): Promise<string | nul
     return null;
   }
 
-  const task = (await Bun.YAML.parse(await Bun.file(taskYamlPath).text())) as TaskConfig & {
+  const task = (await Bun.YAML.parse(
+    await Bun.file(taskYamlPath).text()
+  )) as TaskConfig & {
     instruction?: {
       prompt_file?: string;
       summary?: string;
@@ -134,7 +150,7 @@ async function loadPrompt(runDir: string, taskDir: string): Promise<string | nul
 
 export function splitExportSkipReason(
   split: DatasetSplit,
-  options: { allowPublicEval: boolean; allowPrivateEval: boolean },
+  options: { allowPublicEval: boolean; allowPrivateEval: boolean }
 ): ExportSkipReason | null {
   if (split === "public_eval" && !options.allowPublicEval) {
     return "public_eval_excluded";

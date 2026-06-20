@@ -1,6 +1,6 @@
 # Contribute a task
 
-The benchmark is only as good as its hardest tasks. The most valuable contribution is a new task that a plausible-but-wrong implementation passes on the public tests and fails on the hidden ones — a task that *discriminates*. Tasks that any competent agent clears on the first try add no signal.
+The benchmark is only as good as its hardest tasks. The most valuable contribution is a new task that a plausible-but-wrong implementation passes on the public tests and fails on the hidden ones — a task that _discriminates_. Tasks that any competent agent clears on the first try add no signal.
 
 High-value contributions, roughly in order:
 
@@ -21,7 +21,7 @@ Avoid tasks that need external services, network access, vague product judgment,
 Every task must satisfy three invariants. They are not guidelines — a task that misses any one of them is not discriminative and will not be accepted:
 
 1. **The starter fails the public tests.** The task is non-trivial out of the box.
-2. **The reference solution passes every public *and* hidden test.** The task is solvable and the contract is internally consistent.
+2. **The reference solution passes every public _and_ hidden test.** The task is solvable and the contract is internally consistent.
 3. **A plausible shortcut passes public but fails hidden.** This is the whole point. If you can't name a believable wrong implementation that the public tests admit, the hidden tests aren't doing their job.
 
 Write the shortcut you're trapping into `known_failure_modes` in `task.yaml` — it documents intent and guides reviewers.

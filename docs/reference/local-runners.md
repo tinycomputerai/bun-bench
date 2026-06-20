@@ -56,13 +56,13 @@ solutions, scoring weights, and runner internals are never included.
 
 ### Supported agents
 
-| Agent ID | Status | Description |
-| --- | --- | --- |
-| `claude-code` | implemented | Anthropic Claude Code CLI (`claude -p`) |
-| `codex-cli` | implemented | OpenAI Codex CLI (`codex exec`) |
-| `gpt-5` | implemented | GPT-5 through the Codex CLI harness (`codex exec --model gpt-5`) |
-| `aider` | planned | Aider |
-| `opencode` | planned | OpenCode |
+| Agent ID      | Status      | Description                                                      |
+| ------------- | ----------- | ---------------------------------------------------------------- |
+| `claude-code` | implemented | Anthropic Claude Code CLI (`claude -p`)                          |
+| `codex-cli`   | implemented | OpenAI Codex CLI (`codex exec`)                                  |
+| `gpt-5`       | implemented | GPT-5 through the Codex CLI harness (`codex exec --model gpt-5`) |
+| `aider`       | planned     | Aider                                                            |
+| `opencode`    | planned     | OpenCode                                                         |
 
 All implemented agents share workspace materialization, prompt construction,
 the validation lifecycle, scoring, and the `result.json` schema. They differ only
@@ -73,9 +73,9 @@ in how the agent phase executes.
 ```typescript
 interface Agent {
   readonly id: string;
-  prepare(context: AgentContext): Promise<void>;  // verify binary, write prompt artifact
-  run(context: AgentContext): Promise<AgentRunOutcome>;  // execute in workspace, return status + metrics
-  cleanup(context: AgentContext): Promise<void>;  // always called, even on failure
+  prepare(context: AgentContext): Promise<void>; // verify binary, write prompt artifact
+  run(context: AgentContext): Promise<AgentRunOutcome>; // execute in workspace, return status + metrics
+  cleanup(context: AgentContext): Promise<void>; // always called, even on failure
 }
 ```
 

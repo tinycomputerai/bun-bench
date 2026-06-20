@@ -1,16 +1,16 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Agent, AgentContext, AgentRunOutcome } from "./types";
 import { isOnPath, pipeToFile, prepareLogFiles, remainingMs } from "./process";
+import type { Agent, AgentContext, AgentRunOutcome } from "./types";
 
 const CODEX_BIN = "codex";
 
-export type CodexAgentOptions = {
+export interface CodexAgentOptions {
   /** Agent id recorded in result.json (e.g. "codex-cli", "gpt-5"). */
   id: string;
   /** Optional model override passed to `codex exec --model`. */
   model?: string;
-};
+}
 
 /**
  * OpenAI Codex CLI adapter. Runs `codex exec` non-interactively against the
@@ -29,7 +29,7 @@ export class CodexCliAgent implements Agent {
   async prepare(context: AgentContext): Promise<void> {
     if (!(await isOnPath(CODEX_BIN, context.workspaceDir))) {
       throw new Error(
-        `${CODEX_BIN} CLI not found on PATH; install the OpenAI Codex CLI before running this agent`,
+        `${CODEX_BIN} CLI not found on PATH; install the OpenAI Codex CLI before running this agent`
       );
     }
 
@@ -38,7 +38,10 @@ export class CodexCliAgent implements Agent {
 
   async run(context: AgentContext): Promise<AgentRunOutcome> {
     const startedMs = Date.now();
-    const timeoutMs = remainingMs(context.deadlineMs, context.task.timeouts.total_seconds * 1000);
+    const timeoutMs = remainingMs(
+      context.deadlineMs,
+      context.task.timeouts.total_seconds * 1000
+    );
     const stdoutPath = join(context.logsDir, "agent.stdout.log");
     const stderrPath = join(context.logsDir, "agent.stderr.log");
     prepareLogFiles(stdoutPath, stderrPath);
@@ -72,12 +75,13 @@ export class CodexCliAgent implements Agent {
     const stderrDone = pipeToFile(proc.stderr, stderrPath);
 
     let timedOut = false;
-    const timeout = timeoutMs > 0
-      ? setTimeout(() => {
-          timedOut = true;
-          proc.kill();
-        }, timeoutMs)
-      : undefined;
+    const timeout =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            timedOut = true;
+            proc.kill();
+          }, timeoutMs)
+        : undefined;
 
     const exitCode = await proc.exited;
     if (timeout) {
@@ -105,7 +109,10 @@ export class CodexCliAgent implements Agent {
   }
 }
 
-type TokenUsage = { input?: number; output?: number };
+interface TokenUsage {
+  input?: number;
+  output?: number;
+}
 
 /**
  * Parse token usage and tool-call counts from the JSONL event stream emitted by
@@ -113,8 +120,13 @@ type TokenUsage = { input?: number; output?: number };
  * scans tolerantly and keeps the last cumulative usage it sees. Returns an empty
  * object when no usage is reported (metrics are best-effort, per the contract).
  */
-async function parseCodexMetrics(stdoutPath: string): Promise<
-  Pick<AgentRunOutcome["metrics"], "input_tokens" | "output_tokens" | "tool_calls">
+async function parseCodexMetrics(
+  stdoutPath: string
+): Promise<
+  Pick<
+    AgentRunOutcome["metrics"],
+    "input_tokens" | "output_tokens" | "tool_calls"
+  >
 > {
   try {
     const raw = await Bun.file(stdoutPath).text();
@@ -139,8 +151,12 @@ async function parseCodexMetrics(stdoutPath: string): Promise<
       }
 
       const usage = extractUsage(event);
-      if (usage.input !== undefined) inputTokens = usage.input;
-      if (usage.output !== undefined) outputTokens = usage.output;
+      if (usage.input !== undefined) {
+        inputTokens = usage.input;
+      }
+      if (usage.output !== undefined) {
+        outputTokens = usage.output;
+      }
 
       if (isToolCallEvent(event)) {
         toolCalls += 1;
@@ -151,9 +167,15 @@ async function parseCodexMetrics(stdoutPath: string): Promise<
       AgentRunOutcome["metrics"],
       "input_tokens" | "output_tokens" | "tool_calls"
     > = {};
-    if (inputTokens !== undefined) metrics.input_tokens = inputTokens;
-    if (outputTokens !== undefined) metrics.output_tokens = outputTokens;
-    if (toolCalls > 0) metrics.tool_calls = toolCalls;
+    if (inputTokens !== undefined) {
+      metrics.input_tokens = inputTokens;
+    }
+    if (outputTokens !== undefined) {
+      metrics.output_tokens = outputTokens;
+    }
+    if (toolCalls > 0) {
+      metrics.tool_calls = toolCalls;
+    }
     return metrics;
   } catch {
     return {};
@@ -178,28 +200,38 @@ function extractUsage(event: unknown): TokenUsage {
     event,
   ];
 
-  let result: TokenUsage = {};
+  const result: TokenUsage = {};
   for (const candidate of candidates) {
     if (!isRecord(candidate)) {
       continue;
     }
     const input = numberField(candidate, "input_tokens", "prompt_tokens");
     const output = numberField(candidate, "output_tokens", "completion_tokens");
-    if (input !== undefined) result.input = input;
-    if (output !== undefined) result.output = output;
+    if (input !== undefined) {
+      result.input = input;
+    }
+    if (output !== undefined) {
+      result.output = output;
+    }
   }
   return result;
+}
+
+function extractEventType(event: Record<string, unknown>): string | undefined {
+  if (typeof event.type === "string") {
+    return event.type;
+  }
+  if (isRecord(event.msg) && typeof event.msg.type === "string") {
+    return event.msg.type;
+  }
+  return;
 }
 
 function isToolCallEvent(event: unknown): boolean {
   if (!isRecord(event)) {
     return false;
   }
-  const type = typeof event.type === "string"
-    ? event.type
-    : isRecord(event.msg) && typeof event.msg.type === "string"
-      ? event.msg.type
-      : undefined;
+  const type = extractEventType(event);
   if (!type) {
     return false;
   }
@@ -211,14 +243,17 @@ function isToolCallEvent(event: unknown): boolean {
   );
 }
 
-function numberField(record: Record<string, unknown>, ...keys: string[]): number | undefined {
+function numberField(
+  record: Record<string, unknown>,
+  ...keys: string[]
+): number | undefined {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "number" && Number.isFinite(value)) {
       return value;
     }
   }
-  return undefined;
+  return;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

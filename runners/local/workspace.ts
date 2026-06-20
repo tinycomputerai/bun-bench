@@ -15,7 +15,7 @@ export function createRunDirectory(repoRoot: string, taskId: string): string {
 export function materializeWorkspace(
   taskDir: string,
   workspaceDir: string,
-  mode: RunMode,
+  mode: RunMode
 ): void {
   copyIfExists(join(taskDir, "task.yaml"), join(workspaceDir, "task.yaml"));
   copyIfExists(join(taskDir, "prompt.md"), join(workspaceDir, "prompt.md"));
@@ -24,7 +24,10 @@ export function materializeWorkspace(
     const referenceDir = join(taskDir, "solutions", "reference");
     copyDirectory(referenceDir, workspaceDir);
   } else {
-    copyIfExists(join(taskDir, "package.json"), join(workspaceDir, "package.json"));
+    copyIfExists(
+      join(taskDir, "package.json"),
+      join(workspaceDir, "package.json")
+    );
     copyDirectory(join(taskDir, "src"), join(workspaceDir, "src"));
   }
 
@@ -37,8 +40,14 @@ export function materializeWorkspace(
   }
 
   copyPublicFixtures(taskDir, workspaceDir);
-  copyDirectory(join(taskDir, "tests", "public"), join(workspaceDir, "tests", "public"));
-  copyDirectory(join(taskDir, "tests", "helpers"), join(workspaceDir, "tests", "helpers"));
+  copyDirectory(
+    join(taskDir, "tests", "public"),
+    join(workspaceDir, "tests", "public")
+  );
+  copyDirectory(
+    join(taskDir, "tests", "helpers"),
+    join(workspaceDir, "tests", "helpers")
+  );
 }
 
 function copyPublicFixtures(taskDir: string, workspaceDir: string): void {

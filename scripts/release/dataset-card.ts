@@ -6,17 +6,17 @@ export const DATASET_CARD_FILE = "README.md";
 
 /** The subset of the release manifest the dataset card needs. Structurally
  * compatible with the manifest written by build-release-artifacts.ts. */
-export type DatasetCardManifest = {
-  tag: string;
-  version: string;
-  git_sha: string;
-  created_at: string;
+export interface DatasetCardManifest {
   counts: {
     sft_records: number;
     patch_records: number;
     harbor_tasks: number;
   };
-};
+  created_at: string;
+  git_sha: string;
+  tag: string;
+  version: string;
+}
 
 const BENCHMARK_REPO_URL = "https://github.com/tinycomputerai/bun-server-bench";
 

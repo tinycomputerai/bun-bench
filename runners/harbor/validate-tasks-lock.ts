@@ -6,9 +6,11 @@ import {
   discoverHarborTaskDirs,
   hashDirectory,
   readTasksLock,
-  tasksLockPath,
   type TasksLock,
+  tasksLockPath,
 } from "./tasks-lock";
+
+const ALL_ZEROS_RE = /^0+$/;
 
 export type TaskLockIssue =
   | {
@@ -38,37 +40,44 @@ export type TaskLockIssue =
       actual: string;
     };
 
-export type TasksLockValidationResult = {
-  harborRoot: string;
-  lockPath: string;
-  lock: TasksLock | null;
+export interface TasksLockValidationResult {
   actual: TasksLock;
+  harborRoot: string;
   issues: TaskLockIssue[];
-  tasksToExport: string[];
-  staleSlugs: string[];
   isValid: boolean;
-};
+  lock: TasksLock | null;
+  lockPath: string;
+  staleSlugs: string[];
+  tasksToExport: string[];
+}
 
 export function slugForTaskPath(taskPath: string): string {
   return sanitizeName(basename(taskPath));
 }
 
-export function findChangedTaskPaths(taskPaths: string[], sinceRef?: string): string[] {
+export function findChangedTaskPaths(
+  taskPaths: string[],
+  sinceRef?: string
+): string[] {
   if (!sinceRef) {
     return [];
   }
 
-  if (/^0+$/.test(sinceRef)) {
+  if (ALL_ZEROS_RE.test(sinceRef)) {
     return [...taskPaths].sort();
   }
 
-  const proc = Bun.spawnSync(["git", "diff", "--name-only", sinceRef, "HEAD", "--", "tasks/"], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  const proc = Bun.spawnSync(
+    ["git", "diff", "--name-only", sinceRef, "HEAD", "--", "tasks/"],
+    {
+      stdout: "pipe",
+      stderr: "pipe",
+    }
+  );
 
   if (proc.exitCode !== 0) {
-    const message = proc.stderr.toString().trim() || proc.stdout.toString().trim();
+    const message =
+      proc.stderr.toString().trim() || proc.stdout.toString().trim();
     throw new Error(`failed to diff tasks since ${sinceRef}: ${message}`);
   }
 
@@ -87,13 +96,15 @@ export function findChangedTaskPaths(taskPaths: string[], sinceRef?: string): st
     changedSlugs.add(segments[1]);
   }
 
-  return taskPaths.filter((taskPath) => changedSlugs.has(basename(taskPath))).sort();
+  return taskPaths
+    .filter((taskPath) => changedSlugs.has(basename(taskPath)))
+    .sort();
 }
 
 export function validateTasksLock(
   harborRoot: string,
   taskPaths: string[],
-  options: { changedTaskPaths?: string[] } = {},
+  options: { changedTaskPaths?: string[] } = {}
 ): TasksLockValidationResult {
   const absoluteHarborRoot = resolve(harborRoot);
   const lock = readTasksLock(absoluteHarborRoot);
@@ -114,7 +125,9 @@ export function validateTasksLock(
   for (const taskPath of taskPaths) {
     const slug = slugForTaskPath(taskPath);
     const harborDir = join(absoluteHarborRoot, slug);
-    const actualChecksum = existsSync(harborDir) ? hashDirectory(harborDir) : undefined;
+    const actualChecksum = existsSync(harborDir)
+      ? hashDirectory(harborDir)
+      : undefined;
     const expectedChecksum = lock?.tasks[slug];
 
     if (!actualChecksum) {
@@ -161,11 +174,14 @@ export function validateTasksLock(
     });
   }
 
-  const staleSlugs = discoverHarborTaskDirs(absoluteHarborRoot).filter((slug) => !activeSlugs.has(slug));
+  const staleSlugs = discoverHarborTaskDirs(absoluteHarborRoot).filter(
+    (slug) => !activeSlugs.has(slug)
+  );
   const isValid =
     issues.length === 0 &&
     lock !== null &&
-    Object.keys(lock.tasks).sort().join("\0") === Object.keys(actual.tasks).sort().join("\0");
+    Object.keys(lock.tasks).sort().join("\0") ===
+      Object.keys(actual.tasks).sort().join("\0");
 
   return {
     harborRoot: absoluteHarborRoot,

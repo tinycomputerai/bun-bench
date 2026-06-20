@@ -9,10 +9,10 @@ export const RELEASE_ASSETS_HINT = [
   "See docs/reference/releasing.md.",
 ].join("\n");
 
-export type ReleaseAssetIssue = {
+export interface ReleaseAssetIssue {
   path: string;
   reason: "missing" | "empty";
-};
+}
 
 export function checkReleaseAssets(root = repoRoot()): ReleaseAssetIssue[] {
   const paths = releaseAssetPaths(root);
@@ -40,10 +40,18 @@ export function formatReleaseAssetIssues(issues: ReleaseAssetIssue[]): string {
     return `  - ${issue.path}: file is empty`;
   });
 
-  return ["Required release assets are missing or empty:", ...lines, "", RELEASE_ASSETS_HINT].join("\n");
+  return [
+    "Required release assets are missing or empty:",
+    ...lines,
+    "",
+    RELEASE_ASSETS_HINT,
+  ].join("\n");
 }
 
-export function assertReleaseAssets(root = repoRoot()): { sft: string; patches: string } {
+export function assertReleaseAssets(root = repoRoot()): {
+  sft: string;
+  patches: string;
+} {
   const issues = checkReleaseAssets(root);
   if (issues.length > 0) {
     throw new Error(formatReleaseAssetIssues(issues));

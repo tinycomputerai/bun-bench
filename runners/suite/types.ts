@@ -1,29 +1,29 @@
-export type SuiteSummary = {
+export interface SuiteSummary {
   agent_id: string;
-  total_tasks: number;
-  passed: number;
-  failed: number;
   average_score: number;
-  total_wall_time_ms: number;
-  started_at: string;
   completed_at: string;
-};
+  failed: number;
+  passed: number;
+  started_at: string;
+  total_tasks: number;
+  total_wall_time_ms: number;
+}
 
-export type LeaderboardEntry = {
-  task_id: string;
-  score: number;
+export interface LeaderboardEntry {
   duration_ms: number;
-  status: string;
   run_id: string;
-};
+  score: number;
+  status: string;
+  task_id: string;
+}
 
-export type SuiteLeaderboard = {
+export interface SuiteLeaderboard {
   agent_id: string;
   entries: LeaderboardEntry[];
-};
+}
 
-export type SuiteResult = {
-  summary: SuiteSummary;
+export interface SuiteResult {
   leaderboard: SuiteLeaderboard;
   outputDir: string;
-};
+  summary: SuiteSummary;
+}

@@ -14,7 +14,10 @@ Bun.serve({
       return Response.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    return Response.json({ id: "user_1", email: "user@example.com" }, { status: 200 });
+    return Response.json(
+      { id: "user_1", email: "user@example.com" },
+      { status: 200 }
+    );
   },
 });
 

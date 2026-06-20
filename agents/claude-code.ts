@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Agent, AgentContext, AgentRunOutcome } from "./types";
 import { isOnPath, pipeToFile, prepareLogFiles, remainingMs } from "./process";
+import type { Agent, AgentContext, AgentRunOutcome } from "./types";
 
 const CLAUDE_BIN = "claude";
 
@@ -11,7 +11,7 @@ export class ClaudeCodeAgent implements Agent {
   async prepare(context: AgentContext): Promise<void> {
     if (!(await isOnPath(CLAUDE_BIN, context.workspaceDir))) {
       throw new Error(
-        `${CLAUDE_BIN} CLI not found on PATH; install Claude Code before running this agent`,
+        `${CLAUDE_BIN} CLI not found on PATH; install Claude Code before running this agent`
       );
     }
 
@@ -20,7 +20,10 @@ export class ClaudeCodeAgent implements Agent {
 
   async run(context: AgentContext): Promise<AgentRunOutcome> {
     const startedMs = Date.now();
-    const timeoutMs = remainingMs(context.deadlineMs, context.task.timeouts.total_seconds * 1000);
+    const timeoutMs = remainingMs(
+      context.deadlineMs,
+      context.task.timeouts.total_seconds * 1000
+    );
     const stdoutPath = join(context.logsDir, "agent.stdout.log");
     const stderrPath = join(context.logsDir, "agent.stderr.log");
     prepareLogFiles(stdoutPath, stderrPath);
@@ -44,12 +47,13 @@ export class ClaudeCodeAgent implements Agent {
     const stderrDone = pipeToFile(proc.stderr, stderrPath);
 
     let timedOut = false;
-    const timeout = timeoutMs > 0
-      ? setTimeout(() => {
-          timedOut = true;
-          proc.kill();
-        }, timeoutMs)
-      : undefined;
+    const timeout =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            timedOut = true;
+            proc.kill();
+          }, timeoutMs)
+        : undefined;
 
     const exitCode = await proc.exited;
     if (timeout) {
@@ -77,8 +81,13 @@ export class ClaudeCodeAgent implements Agent {
   }
 }
 
-async function parseClaudeMetrics(stdoutPath: string): Promise<
-  Pick<AgentRunOutcome["metrics"], "input_tokens" | "output_tokens" | "tool_calls">
+async function parseClaudeMetrics(
+  stdoutPath: string
+): Promise<
+  Pick<
+    AgentRunOutcome["metrics"],
+    "input_tokens" | "output_tokens" | "tool_calls"
+  >
 > {
   try {
     const raw = await Bun.file(stdoutPath).text();

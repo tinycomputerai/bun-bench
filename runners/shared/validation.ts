@@ -1,5 +1,9 @@
 import { join } from "node:path";
-import { runShellCommand, startManagedProcess, waitForHttpReadiness } from "../local/exec";
+import {
+  runShellCommand,
+  startManagedProcess,
+  waitForHttpReadiness,
+} from "../local/exec";
 import {
   failedOutcome,
   markSkippedAfter,
@@ -8,22 +12,24 @@ import {
 } from "../local/result";
 import type { RunResult, RunStatus, TaskConfig } from "../local/types";
 
-export type ValidationInput = {
+export interface ValidationInput {
+  deadlineMs: number;
+  logsDir: string;
   task: TaskConfig;
   taskDir: string;
   workspaceDir: string;
-  logsDir: string;
-  deadlineMs: number;
-};
+}
 
-export type ValidationOutput = {
-  status: RunStatus;
-  outcome: RunResult["outcome"];
+export interface ValidationOutput {
   durations: RunResult["durations"];
   error: string | null;
-};
+  outcome: RunResult["outcome"];
+  status: RunStatus;
+}
 
-export async function runValidationLifecycle(input: ValidationInput): Promise<ValidationOutput> {
+export async function runValidationLifecycle(
+  input: ValidationInput
+): Promise<ValidationOutput> {
   const { task, taskDir, workspaceDir, logsDir, deadlineMs } = input;
   const durations = emptyDurations();
   const outcome = skippedOutcomes();
@@ -40,7 +46,11 @@ export async function runValidationLifecycle(input: ValidationInput): Promise<Va
 
   try {
     if (Date.now() >= deadlineMs) {
-      return timedOut("run exceeded total timeout before install", outcome, durations);
+      return timedOut(
+        "run exceeded total timeout before install",
+        outcome,
+        durations
+      );
     }
 
     const install = await runShellCommand({
@@ -53,7 +63,11 @@ export async function runValidationLifecycle(input: ValidationInput): Promise<Va
     durations.install_ms = install.durationMs;
 
     if (install.timedOut || Date.now() >= deadlineMs) {
-      return timedOut("install timed out", { ...outcome, install: "failed" }, durations);
+      return timedOut(
+        "install timed out",
+        { ...outcome, install: "failed" },
+        durations
+      );
     }
 
     if (install.exitCode !== 0) {
@@ -63,7 +77,11 @@ export async function runValidationLifecycle(input: ValidationInput): Promise<Va
     outcome.install = "passed";
 
     if (Date.now() >= deadlineMs) {
-      return timedOut("run exceeded total timeout before start", outcome, durations);
+      return timedOut(
+        "run exceeded total timeout before start",
+        outcome,
+        durations
+      );
     }
 
     const startStartedMs = Date.now();
@@ -74,13 +92,19 @@ export async function runValidationLifecycle(input: ValidationInput): Promise<Va
       stderrPath: join(logsDir, "start.stderr.log"),
     });
 
-    const startWaitMs = remainingMs(deadlineMs, task.timeouts.start_seconds * 1000);
+    const startWaitMs = remainingMs(
+      deadlineMs,
+      task.timeouts.start_seconds * 1000
+    );
     await sleep(Math.min(startWaitMs, 250));
     durations.start_ms = Date.now() - startStartedMs;
 
     if (app.proc.exitCode !== null) {
       await app.stop();
-      fail("start", `start command exited early with status ${app.proc.exitCode}`);
+      fail(
+        "start",
+        `start command exited early with status ${app.proc.exitCode}`
+      );
       return { status, outcome, durations, error };
     }
     outcome.start = "passed";
@@ -96,17 +120,24 @@ export async function runValidationLifecycle(input: ValidationInput): Promise<Va
       port: app.port,
       path: readiness.path ?? "/",
       expectedStatus: readiness.expected_status ?? 200,
-      timeoutMs: remainingMs(deadlineMs, task.timeouts.readiness_seconds * 1000),
+      timeoutMs: remainingMs(
+        deadlineMs,
+        task.timeouts.readiness_seconds * 1000
+      ),
       process: app,
     });
     durations.readiness_ms = readinessResult.durationMs;
 
     if (Date.now() >= deadlineMs) {
       await app.stop();
-      return timedOut("run exceeded total timeout during readiness", {
-        ...outcome,
-        readiness: "failed",
-      }, durations);
+      return timedOut(
+        "run exceeded total timeout during readiness",
+        {
+          ...outcome,
+          readiness: "failed",
+        },
+        durations
+      );
     }
 
     if (!readinessResult.ok) {
@@ -136,11 +167,18 @@ export async function runValidationLifecycle(input: ValidationInput): Promise<Va
     durations.public_tests_ms = publicTests.durationMs;
 
     if (publicTests.timedOut || Date.now() >= deadlineMs) {
-      return timedOut("public tests timed out", { ...outcome, public_tests: "failed" }, durations);
+      return timedOut(
+        "public tests timed out",
+        { ...outcome, public_tests: "failed" },
+        durations
+      );
     }
 
     if (publicTests.exitCode !== 0) {
-      fail("public_tests", `public tests exited with status ${publicTests.exitCode}`);
+      fail(
+        "public_tests",
+        `public tests exited with status ${publicTests.exitCode}`
+      );
       return { status, outcome, durations, error };
     }
     outcome.public_tests = "passed";
@@ -156,11 +194,18 @@ export async function runValidationLifecycle(input: ValidationInput): Promise<Va
     durations.hidden_tests_ms = hiddenTests.durationMs;
 
     if (hiddenTests.timedOut || Date.now() >= deadlineMs) {
-      return timedOut("hidden tests timed out", { ...outcome, hidden_tests: "failed" }, durations);
+      return timedOut(
+        "hidden tests timed out",
+        { ...outcome, hidden_tests: "failed" },
+        durations
+      );
     }
 
     if (hiddenTests.exitCode !== 0) {
-      fail("hidden_tests", `hidden tests exited with status ${hiddenTests.exitCode}`);
+      fail(
+        "hidden_tests",
+        `hidden tests exited with status ${hiddenTests.exitCode}`
+      );
       return { status, outcome, durations, error };
     }
 
@@ -181,23 +226,34 @@ export async function runValidationLifecycle(input: ValidationInput): Promise<Va
 function timedOut(
   message: string,
   outcome: RunResult["outcome"],
-  durations: RunResult["durations"],
+  durations: RunResult["durations"]
 ): ValidationOutput {
   return {
     status: "timed_out",
-    outcome: markSkippedAfter(outcome, firstFailedPhase(outcome) ?? "hidden_tests"),
+    outcome: markSkippedAfter(
+      outcome,
+      firstFailedPhase(outcome) ?? "hidden_tests"
+    ),
     durations,
     error: message,
   };
 }
 
-function firstFailedPhase(outcome: RunResult["outcome"]): keyof RunResult["outcome"] | undefined {
-  for (const phase of ["install", "start", "readiness", "public_tests", "hidden_tests"] as const) {
+function firstFailedPhase(
+  outcome: RunResult["outcome"]
+): keyof RunResult["outcome"] | undefined {
+  for (const phase of [
+    "install",
+    "start",
+    "readiness",
+    "public_tests",
+    "hidden_tests",
+  ] as const) {
     if (outcome[phase] === "failed") {
       return phase;
     }
   }
-  return undefined;
+  return;
 }
 
 function emptyDurations(): RunResult["durations"] {

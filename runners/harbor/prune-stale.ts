@@ -1,7 +1,10 @@
 import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-export function pruneStaleHarborExports(outRoot: string, activeSlugs: Set<string>): string[] {
+export function pruneStaleHarborExports(
+  outRoot: string,
+  activeSlugs: Set<string>
+): string[] {
   if (!existsSync(outRoot)) {
     return [];
   }

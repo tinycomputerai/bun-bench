@@ -2,21 +2,30 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { buildPatchRecord, buildSftRecord } from "./build-records";
 import { discoverRuns } from "./discover-runs";
-import { createSkipCounter, prepareRunForExport } from "./prepare-run";
-import type { ExportOptions, ExportSummary, PatchRecord, SftRecord } from "./types";
 import type { PreparedRun } from "./prepare-run";
+import { createSkipCounter, prepareRunForExport } from "./prepare-run";
+import type {
+  ExportOptions,
+  ExportSummary,
+  PatchRecord,
+  SftRecord,
+} from "./types";
 
-export async function exportSftDataset(options: ExportOptions): Promise<ExportSummary> {
+export function exportSftDataset(
+  options: ExportOptions
+): Promise<ExportSummary> {
   return exportDataset(options, buildSftRecord);
 }
 
-export async function exportPatchDataset(options: ExportOptions): Promise<ExportSummary> {
+export function exportPatchDataset(
+  options: ExportOptions
+): Promise<ExportSummary> {
   return exportDataset(options, buildPatchRecord);
 }
 
 async function exportDataset<T extends SftRecord | PatchRecord>(
   options: ExportOptions,
-  buildRecord: (prepared: PreparedRun) => T,
+  buildRecord: (prepared: PreparedRun) => T
 ): Promise<ExportSummary> {
   const runDirs = discoverRuns(options.runsPattern);
   const skipped = createSkipCounter();
@@ -44,7 +53,9 @@ async function exportDataset<T extends SftRecord | PatchRecord>(
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(
     outPath,
-    records.length > 0 ? `${records.map((record) => JSON.stringify(record)).join("\n")}\n` : "",
+    records.length > 0
+      ? `${records.map((record) => JSON.stringify(record)).join("\n")}\n`
+      : ""
   );
 
   return {
@@ -55,11 +66,18 @@ async function exportDataset<T extends SftRecord | PatchRecord>(
   };
 }
 
-export function formatExportSummary(label: string, summary: ExportSummary): string {
-  const skippedEntries = Object.entries(summary.skipped).filter(([, count]) => count > 0);
+export function formatExportSummary(
+  label: string,
+  summary: ExportSummary
+): string {
+  const skippedEntries = Object.entries(summary.skipped).filter(
+    ([, count]) => count > 0
+  );
   const skippedText =
     skippedEntries.length > 0
-      ? skippedEntries.map(([reason, count]) => `${reason}: ${count}`).join(", ")
+      ? skippedEntries
+          .map(([reason, count]) => `${reason}: ${count}`)
+          .join(", ")
       : "none";
 
   return [

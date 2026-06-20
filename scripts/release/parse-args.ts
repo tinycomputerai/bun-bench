@@ -1,7 +1,7 @@
-export type ReleaseCliOptions = {
-  tag: string;
+export interface ReleaseCliOptions {
   dryRun: boolean;
-};
+  tag: string;
+}
 
 const RELEASE_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 
@@ -26,7 +26,6 @@ export function parseReleaseArgs(argv: string[]): ReleaseCliOptions {
     }
     if (arg === "--dry-run") {
       dryRun = true;
-      continue;
     }
   }
 
@@ -36,7 +35,7 @@ export function parseReleaseArgs(argv: string[]): ReleaseCliOptions {
 
   if (!RELEASE_VERSION_PATTERN.test(version)) {
     throw new Error(
-      `invalid release version format: ${version} (expected X.Y.Z, without a leading v)`,
+      `invalid release version format: ${version} (expected X.Y.Z, without a leading v)`
     );
   }
 

@@ -42,7 +42,7 @@ export function parseExportArgs(argv: string[]): ExportOptions {
     throw new Error(usage());
   }
 
-  if (!runsPattern || !outPath) {
+  if (!(runsPattern && outPath)) {
     throw new Error(usage());
   }
 

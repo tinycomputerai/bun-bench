@@ -1,6 +1,6 @@
 # Train on trajectories
 
-A score tells you *whether* an agent solved a task. A trajectory tells you *how*. bun-server-bench turns every full-credit agent run into a training example: the exact prompt the agent saw, the starter-to-solution diff it produced, and the metadata needed to keep training and evaluation cleanly separated. The result is a supervised dataset for specializing a small model on Bun backend engineering — the same data we use to study whether a narrow model can match a frontier agent on this domain.
+A score tells you _whether_ an agent solved a task. A trajectory tells you _how_. bun-server-bench turns every full-credit agent run into a training example: the exact prompt the agent saw, the starter-to-solution diff it produced, and the metadata needed to keep training and evaluation cleanly separated. The result is a supervised dataset for specializing a small model on Bun backend engineering — the same data we use to study whether a narrow model can match a frontier agent on this domain.
 
 Exports are read-only. They scan existing run directories under `runs/` and write JSONL; they never re-run an agent.
 
@@ -32,7 +32,10 @@ Reference solutions, oracle runs, hidden tests, fixtures, and lockfiles are neve
     "run_id": "...",
     "score": 100,
     "agent_id": "claude-code",
-    "dataset": { "split": "dev", "leakage_group": "authentication.bearer-profile" }
+    "dataset": {
+      "split": "dev",
+      "leakage_group": "authentication.bearer-profile"
+    }
   }
 }
 ```
@@ -47,7 +50,10 @@ Reference solutions, oracle runs, hidden tests, fixtures, and lockfiles are neve
   "files_changed": ["src/server.ts"],
   "score": 100,
   "agent_id": "claude-code",
-  "dataset": { "split": "dev", "leakage_group": "authentication.bearer-profile" }
+  "dataset": {
+    "split": "dev",
+    "leakage_group": "authentication.bearer-profile"
+  }
 }
 ```
 
@@ -67,12 +73,12 @@ bun run export:patches \
 
 Both commands share the same hygiene flags:
 
-| Flag | Default | Effect |
-| --- | --- | --- |
-| `--min-score` | `100` | Only export runs at or above this score |
-| `--allow-public-eval` | off | Include `public_eval` tasks (excluded by default) |
-| `--allow-private-eval` | off | Include `private_eval` tasks (excluded by default) |
-| `--tasks-root` | `tasks` | Task package root for prompts and metadata |
+| Flag                   | Default | Effect                                             |
+| ---------------------- | ------- | -------------------------------------------------- |
+| `--min-score`          | `100`   | Only export runs at or above this score            |
+| `--allow-public-eval`  | off     | Include `public_eval` tasks (excluded by default)  |
+| `--allow-private-eval` | off     | Include `private_eval` tasks (excluded by default) |
+| `--tasks-root`         | `tasks` | Task package root for prompts and metadata         |
 
 By default the exporter takes only agent runs that completed at full credit, includes `train` and `dev`, and excludes `public_eval`, `private_eval`, and any task marked `trainable: false`. The defaults are the safe path — you have to opt in, explicitly, to anything that risks evaluation leakage.
 

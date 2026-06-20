@@ -1,10 +1,17 @@
 import { cpSync, existsSync, mkdirSync, statSync } from "node:fs";
-import { exportDatasetPaths, releaseAssetPaths, releaseAssetsDir, repoRoot } from "./paths";
+import {
+  exportDatasetPaths,
+  releaseAssetPaths,
+  releaseAssetsDir,
+  repoRoot,
+} from "./paths";
 
 function requireExport(path: string, label: string): void {
   if (!existsSync(path)) {
     console.error(`[release:stage] missing export file: ${path}`);
-    console.error(`run export:${label === "sft" ? "sft" : "patches"} before staging release assets`);
+    console.error(
+      `run export:${label === "sft" ? "sft" : "patches"} before staging release assets`
+    );
     process.exit(1);
   }
 

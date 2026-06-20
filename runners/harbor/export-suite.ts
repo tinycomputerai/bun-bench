@@ -1,12 +1,11 @@
 #!/usr/bin/env bun
 
-import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { discoverTasks } from "../suite/discover-tasks";
+import { exportTask, sanitizeName } from "./export";
 import { pruneStaleHarborExports } from "./prune-stale";
 import { syncDataset } from "./sync-dataset";
 import { writeTasksLock } from "./tasks-lock";
-import { exportTask, sanitizeName } from "./export";
 
 const DEFAULT_OUT_ROOT = "harbor";
 
@@ -58,12 +57,17 @@ async function main(): Promise<void> {
       console.log(`ok    ${result.id} -> ${result.outDir}`);
     } catch (error) {
       failed += 1;
-      console.error(`FAIL  ${taskPath}: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `FAIL  ${taskPath}: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
   if (failed === 0) {
-    const removed = pruneStaleHarborExports(resolve(process.cwd(), outRoot), activeSlugs);
+    const removed = pruneStaleHarborExports(
+      resolve(process.cwd(), outRoot),
+      activeSlugs
+    );
     for (const slug of removed) {
       console.log(`[harbor] removed stale export ${slug}`);
     }
@@ -72,7 +76,9 @@ async function main(): Promise<void> {
     syncDataset(outRoot);
   }
 
-  console.log(`\n[harbor] exported ${exported}/${taskPaths.length} task(s) to ${outRoot}`);
+  console.log(
+    `\n[harbor] exported ${exported}/${taskPaths.length} task(s) to ${outRoot}`
+  );
   if (failed > 0) {
     process.exitCode = 1;
   }

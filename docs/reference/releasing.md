@@ -14,11 +14,11 @@ tag, and fetched by the workflow at publish time.
 
 A release publishes three surfaces:
 
-| Surface | What gets published |
-| --- | --- |
+| Surface         | What gets published                                              |
+| --------------- | ---------------------------------------------------------------- |
 | GitHub Releases | Changelog, benchmark tarball, SFT JSONL, patches JSONL, manifest |
-| Harbor Hub | All packages under `harbor/`, tagged with the release tag |
-| Hugging Face | Dataset repo `tinycomputer/bun-server-bench-trajectories` |
+| Harbor Hub      | All packages under `harbor/`, tagged with the release tag        |
+| Hugging Face    | Dataset repo `tinycomputer/bun-server-bench-trajectories`        |
 
 ## Flow
 
@@ -87,12 +87,12 @@ GitHub Release via `release-it`, publishes Harbor packages when
 
 ## Prerequisites
 
-| Secret / variable | Type | Purpose |
-| --- | --- | --- |
-| `TINYCOMPUTER_GITHUB_APP_CLIENT_ID` | org variable | Client ID for the TinyComputer GitHub App |
-| `TINYCOMPUTER_GITHUB_APP_PRIVATE_KEY` | secret | Private key for the GitHub App |
-| `HARBOR_TOKEN` | secret | Base64-encoded Harbor CLI credentials |
-| `HF_TOKEN` | secret | Hugging Face write token (staging + final publish) |
+| Secret / variable                     | Type         | Purpose                                            |
+| ------------------------------------- | ------------ | -------------------------------------------------- |
+| `TINYCOMPUTER_GITHUB_APP_CLIENT_ID`   | org variable | Client ID for the TinyComputer GitHub App          |
+| `TINYCOMPUTER_GITHUB_APP_PRIVATE_KEY` | secret       | Private key for the GitHub App                     |
+| `HARBOR_TOKEN`                        | secret       | Base64-encoded Harbor CLI credentials              |
+| `HF_TOKEN`                            | secret       | Hugging Face write token (staging + final publish) |
 
 GitHub Releases are created by the **TinyComputer GitHub App**, not the default
 `GITHUB_TOKEN`: the workflow mints an installation token with `contents: write`

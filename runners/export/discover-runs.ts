@@ -1,8 +1,13 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
+const BACKSLASH_RE = /\\/g;
+const TRAILING_SLASHES_RE = /\/+$/;
+
 export function discoverRuns(pattern: string, cwd = process.cwd()): string[] {
-  const normalized = pattern.replace(/\\/g, "/").replace(/\/+$/, "");
+  const normalized = pattern
+    .replace(BACKSLASH_RE, "/")
+    .replace(TRAILING_SLASHES_RE, "");
 
   if (!normalized.includes("*")) {
     const absolute = resolve(cwd, normalized);
@@ -26,10 +31,16 @@ export function discoverRuns(pattern: string, cwd = process.cwd()): string[] {
 
 function resolveRunsRoot(pattern: string, cwd: string): string {
   const wildcardIndex = pattern.indexOf("*");
-  const prefix = pattern.slice(0, wildcardIndex).replace(/\/+$/, "");
+  const prefix = pattern
+    .slice(0, wildcardIndex)
+    .replace(TRAILING_SLASHES_RE, "");
   const absolutePrefix = resolve(cwd, prefix || ".");
 
-  if (basename(absolutePrefix) === "runs" || prefix.endsWith("/runs") || prefix === "runs") {
+  if (
+    basename(absolutePrefix) === "runs" ||
+    prefix.endsWith("/runs") ||
+    prefix === "runs"
+  ) {
     return absolutePrefix;
   }
 

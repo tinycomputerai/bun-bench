@@ -1,7 +1,6 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";
 import type { PatchRecord, SftRecord } from "../../runners/export/types";
-import { formatReleaseAssetIssues, checkReleaseAssets } from "./release-assets";
 import { DATASET_CARD_FILE } from "./dataset-card";
 import { parseReleaseArgs, usage } from "./parse-args";
 import {
@@ -12,14 +11,18 @@ import {
   releaseDir,
   TARBALL_EXCLUDE_DIRS,
 } from "./paths";
+import { checkReleaseAssets, formatReleaseAssetIssues } from "./release-assets";
+
+const BACKSLASH_RE = /\\/g;
+const LEADING_DOT_SLASH_RE = /^\.\//;
 
 type JsonlRecord = SftRecord | PatchRecord;
 
-export type DatasetVerificationIssue = {
+export interface DatasetVerificationIssue {
   file: string;
   line: number;
   reason: string;
-};
+}
 
 export function readJsonlRecords(filePath: string): JsonlRecord[] {
   const content = readFileSync(filePath, "utf8").trim();
@@ -38,7 +41,7 @@ export function readJsonlRecords(filePath: string): JsonlRecord[] {
 
 export function verifyDatasetFile(
   filePath: string,
-  label: "sft" | "patches",
+  label: "sft" | "patches"
 ): DatasetVerificationIssue[] {
   const issues: DatasetVerificationIssue[] = [];
 
@@ -55,7 +58,11 @@ export function verifyDatasetFile(
 
   const records = readJsonlRecords(filePath);
   if (records.length === 0) {
-    issues.push({ file: filePath, line: 0, reason: "file contains no JSONL records" });
+    issues.push({
+      file: filePath,
+      line: 0,
+      reason: "file contains no JSONL records",
+    });
     return issues;
   }
 
@@ -64,12 +71,20 @@ export function verifyDatasetFile(
     const split = recordSplit(record, label);
 
     if (!split) {
-      issues.push({ file: filePath, line, reason: "missing dataset.split metadata" });
+      issues.push({
+        file: filePath,
+        line,
+        reason: "missing dataset.split metadata",
+      });
       return;
     }
 
     if (FORBIDDEN_EVAL_SPLITS.has(split)) {
-      issues.push({ file: filePath, line, reason: `forbidden eval split exported: ${split}` });
+      issues.push({
+        file: filePath,
+        line,
+        reason: `forbidden eval split exported: ${split}`,
+      });
     }
 
     const patchText = recordPatchText(record, label);
@@ -87,7 +102,10 @@ export function verifyDatasetFile(
   return issues;
 }
 
-function recordSplit(record: JsonlRecord, label: "sft" | "patches"): string | undefined {
+function recordSplit(
+  record: JsonlRecord,
+  label: "sft" | "patches"
+): string | undefined {
   if (label === "sft" && "messages" in record) {
     return record.metadata.dataset.split;
   }
@@ -96,12 +114,17 @@ function recordSplit(record: JsonlRecord, label: "sft" | "patches"): string | un
     return record.dataset.split;
   }
 
-  return undefined;
+  return;
 }
 
-function recordPatchText(record: JsonlRecord, label: "sft" | "patches"): string {
+function recordPatchText(
+  record: JsonlRecord,
+  label: "sft" | "patches"
+): string {
   if (label === "sft" && "messages" in record) {
-    const assistant = record.messages.find((message) => message.role === "assistant");
+    const assistant = record.messages.find(
+      (message) => message.role === "assistant"
+    );
     return assistant?.content ?? "";
   }
 
@@ -116,11 +139,15 @@ export function verifyTarballEntries(entries: string[]): string[] {
   const issues: string[] = [];
 
   for (const entry of entries) {
-    const normalized = entry.replace(/\\/g, "/").replace(/^\.\//, "");
+    const normalized = entry
+      .replace(BACKSLASH_RE, "/")
+      .replace(LEADING_DOT_SLASH_RE, "");
     const topLevel = normalized.split("/")[0];
 
     if (TARBALL_EXCLUDE_DIRS.has(topLevel)) {
-      issues.push(`tarball includes forbidden top-level directory: ${topLevel}`);
+      issues.push(
+        `tarball includes forbidden top-level directory: ${topLevel}`
+      );
       continue;
     }
 
@@ -152,7 +179,10 @@ function listTarballEntries(tarballPath: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-function parseVerifyFlags(argv: string[]): { datasetsOnly: boolean; remaining: string[] } {
+function parseVerifyFlags(argv: string[]): {
+  datasetsOnly: boolean;
+  remaining: string[];
+} {
   const remaining: string[] = [];
   let datasetsOnly = false;
 
@@ -169,7 +199,7 @@ function parseVerifyFlags(argv: string[]): { datasetsOnly: boolean; remaining: s
 
 function main(): void {
   const { datasetsOnly, remaining } = parseVerifyFlags(process.argv.slice(2));
-  let options;
+  let options: ReturnType<typeof parseReleaseArgs>;
   try {
     options = parseReleaseArgs(remaining);
   } catch (error) {
@@ -187,28 +217,31 @@ function main(): void {
   const issues: DatasetVerificationIssue[] = assetIssues.map((issue) => ({
     file: issue.path,
     line: 0,
-    reason: issue.reason === "missing" ? "file does not exist" : "file is empty",
+    reason:
+      issue.reason === "missing" ? "file does not exist" : "file is empty",
   }));
 
   if (assetIssues.length === 0) {
     issues.push(
       ...verifyDatasetFile(assets.sft, "sft"),
-      ...verifyDatasetFile(assets.patches, "patches"),
+      ...verifyDatasetFile(assets.patches, "patches")
     );
   }
 
   if (!datasetsOnly) {
-    if (!existsSync(tarballPath)) {
+    if (existsSync(tarballPath)) {
+      const tarballIssues = verifyTarballEntries(
+        listTarballEntries(tarballPath)
+      );
+      for (const reason of tarballIssues) {
+        issues.push({ file: basename(tarballPath), line: 0, reason });
+      }
+    } else {
       issues.push({
         file: tarballPath,
         line: 0,
         reason: "release tarball has not been built yet",
       });
-    } else {
-      const tarballIssues = verifyTarballEntries(listTarballEntries(tarballPath));
-      for (const reason of tarballIssues) {
-        issues.push({ file: basename(tarballPath), line: 0, reason });
-      }
     }
 
     if (!existsSync(cardPath)) {
@@ -223,7 +256,8 @@ function main(): void {
   if (issues.length > 0) {
     console.error("[release:verify] failed");
     for (const issue of issues) {
-      const location = issue.line > 0 ? `${issue.file}:${issue.line}` : issue.file;
+      const location =
+        issue.line > 0 ? `${issue.file}:${issue.line}` : issue.file;
       console.error(`  - ${location}: ${issue.reason}`);
     }
     if (assetIssues.length > 0) {

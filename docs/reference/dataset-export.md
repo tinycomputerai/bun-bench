@@ -22,14 +22,14 @@ bun run export:patches --runs 'runs/**' --out datasets/patches/bun-server-bench.
 
 Both commands accept the same options:
 
-| Flag | Default | Description |
-| --- | --- | --- |
-| `--runs` | required | Glob or path to run directories containing `result.json` |
-| `--out` | required | Output JSONL path |
-| `--min-score` | `100` | Minimum score required for export |
-| `--allow-public-eval` | off | Include `public_eval` tasks (excluded by default) |
-| `--allow-private-eval` | off | Include `private_eval` tasks (excluded by default) |
-| `--tasks-root` | `tasks` | Task package root for prompts and dataset metadata |
+| Flag                   | Default  | Description                                              |
+| ---------------------- | -------- | -------------------------------------------------------- |
+| `--runs`               | required | Glob or path to run directories containing `result.json` |
+| `--out`                | required | Output JSONL path                                        |
+| `--min-score`          | `100`    | Minimum score required for export                        |
+| `--allow-public-eval`  | off      | Include `public_eval` tasks (excluded by default)        |
+| `--allow-private-eval` | off      | Include `private_eval` tasks (excluded by default)       |
+| `--tasks-root`         | `tasks`  | Task package root for prompts and dataset metadata       |
 
 ## Input: Run Artifacts
 
@@ -143,21 +143,21 @@ tagging a release. See `../contributing/releasing.md`.
 
 When a run is not exported, the command reports aggregated skip reasons:
 
-| Reason | Meaning |
-| --- | --- |
-| `missing_result` | Run directory has no `result.json` |
-| `invalid_result` | `result.json` could not be parsed |
-| `not_agent_run` | Not an agent run (missing `mode: "agent"`) |
-| `not_completed` | Run did not reach `status: "completed"` |
-| `below_min_score` | Score below `--min-score` |
-| `public_eval_excluded` | Task split is `public_eval` and flag not set |
+| Reason                  | Meaning                                       |
+| ----------------------- | --------------------------------------------- |
+| `missing_result`        | Run directory has no `result.json`            |
+| `invalid_result`        | `result.json` could not be parsed             |
+| `not_agent_run`         | Not an agent run (missing `mode: "agent"`)    |
+| `not_completed`         | Run did not reach `status: "completed"`       |
+| `below_min_score`       | Score below `--min-score`                     |
+| `public_eval_excluded`  | Task split is `public_eval` and flag not set  |
 | `private_eval_excluded` | Task split is `private_eval` and flag not set |
-| `not_trainable` | Task has `dataset.trainable: false` |
-| `missing_task` | Task package or dataset metadata not found |
-| `missing_prompt` | Prompt could not be loaded |
-| `missing_solution` | Workspace missing or identical to starter |
-| `reference_solution` | Workspace matches the reference oracle |
-| `hidden_tests_in_patch` | Patch would include forbidden paths |
+| `not_trainable`         | Task has `dataset.trainable: false`           |
+| `missing_task`          | Task package or dataset metadata not found    |
+| `missing_prompt`        | Prompt could not be loaded                    |
+| `missing_solution`      | Workspace missing or identical to starter     |
+| `reference_solution`    | Workspace matches the reference oracle        |
+| `hidden_tests_in_patch` | Patch would include forbidden paths           |
 
 ## Implementation
 

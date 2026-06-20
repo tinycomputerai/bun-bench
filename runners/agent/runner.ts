@@ -2,21 +2,24 @@ import { writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { createAgent } from "../../agents/registry";
 import { validateTaskDirectory } from "../../validators/validate-task";
-import { createRunDirectory, materializeWorkspace } from "../local/workspace";
 import type { TaskConfig } from "../local/types";
+import { createRunDirectory, materializeWorkspace } from "../local/workspace";
 import { runValidationLifecycle } from "../shared/validation";
 import { constructPrompt } from "./prompt";
 import {
+  type AgentRunResult,
+  type AgentRunStatus,
   buildAgentResult,
   markSkippedAfterAgent,
   skippedAgentOutcomes,
-  type AgentRunResult,
-  type AgentRunStatus,
 } from "./result";
 
 const repoRoot = resolve(import.meta.dir, "../..");
 
-export async function runAgent(taskPath: string, agentId: string): Promise<AgentRunResult> {
+export async function runAgent(
+  taskPath: string,
+  agentId: string
+): Promise<AgentRunResult> {
   const startedAt = new Date().toISOString();
   const runStartedMs = Date.now();
   const taskDir = resolve(process.cwd(), taskPath);
@@ -93,12 +96,7 @@ export async function runAgent(taskPath: string, agentId: string): Promise<Agent
         error = "agent timed out";
         outcome.agent = "failed";
         Object.assign(outcome, markSkippedAfterAgent(outcome, "agent"));
-      } else if (agentResult.exitCode !== 0) {
-        status = "failed_agent";
-        error = `agent exited with status ${agentResult.exitCode}`;
-        outcome.agent = "failed";
-        Object.assign(outcome, markSkippedAfterAgent(outcome, "agent"));
-      } else {
+      } else if (agentResult.exitCode === 0) {
         outcome.agent = "passed";
 
         const validationResult = await runValidationLifecycle({
@@ -113,6 +111,11 @@ export async function runAgent(taskPath: string, agentId: string): Promise<Agent
         error = validationResult.error;
         validationDurations = validationResult.durations;
         Object.assign(outcome, validationResult.outcome);
+      } else {
+        status = "failed_agent";
+        error = `agent exited with status ${agentResult.exitCode}`;
+        outcome.agent = "failed";
+        Object.assign(outcome, markSkippedAfterAgent(outcome, "agent"));
       }
     }
   } catch (runError) {
@@ -158,11 +161,16 @@ async function loadTaskConfig(taskDir: string): Promise<TaskConfig> {
 
 function relativeToCwd(absolutePath: string): string {
   const cwd = process.cwd();
-  return absolutePath.startsWith(`${cwd}/`) ? absolutePath.slice(cwd.length + 1) : absolutePath;
+  return absolutePath.startsWith(`${cwd}/`)
+    ? absolutePath.slice(cwd.length + 1)
+    : absolutePath;
 }
 
 function writeResult(runDir: string, result: AgentRunResult): void {
-  writeFileSync(join(runDir, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
+  writeFileSync(
+    join(runDir, "result.json"),
+    `${JSON.stringify(result, null, 2)}\n`
+  );
 }
 
 function emptyDurations(totalMs: number): AgentRunResult["durations"] {
@@ -177,7 +185,10 @@ function emptyDurations(totalMs: number): AgentRunResult["durations"] {
   };
 }
 
-function emptyValidationDurations(): Omit<AgentRunResult["durations"], "agent_ms" | "total_ms"> {
+function emptyValidationDurations(): Omit<
+  AgentRunResult["durations"],
+  "agent_ms" | "total_ms"
+> {
   return {
     install_ms: 0,
     start_ms: 0,

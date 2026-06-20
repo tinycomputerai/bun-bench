@@ -1,9 +1,6 @@
 import type { PhaseOutcome, RunMode, RunResult, RunStatus } from "./types";
 
-export function computeScore(
-  status: RunStatus,
-  maxScore: number,
-): number {
+export function computeScore(status: RunStatus, maxScore: number): number {
   switch (status) {
     case "completed":
       return maxScore;
@@ -67,7 +64,7 @@ export function skippedOutcomes(): RunResult["outcome"] {
 
 export function markSkippedAfter(
   outcome: RunResult["outcome"],
-  failedPhase: keyof RunResult["outcome"],
+  failedPhase: keyof RunResult["outcome"]
 ): RunResult["outcome"] {
   const order: Array<keyof RunResult["outcome"]> = [
     "install",
@@ -86,7 +83,9 @@ export function markSkippedAfter(
   return next;
 }
 
-export function statusForFailedPhase(phase: keyof RunResult["outcome"]): RunStatus {
+export function statusForFailedPhase(
+  phase: keyof RunResult["outcome"]
+): RunStatus {
   switch (phase) {
     case "install":
       return "failed_install";
@@ -103,6 +102,8 @@ export function statusForFailedPhase(phase: keyof RunResult["outcome"]): RunStat
   }
 }
 
-export function failedOutcome(phase: keyof RunResult["outcome"]): PhaseOutcome {
+export function failedOutcome(
+  _phase: keyof RunResult["outcome"]
+): PhaseOutcome {
   return "failed";
 }

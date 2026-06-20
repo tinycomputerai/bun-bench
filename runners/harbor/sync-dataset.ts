@@ -17,7 +17,8 @@ export const DATASET_DESCRIPTION =
 export const DATASET_AUTHOR = "tincomputer.ai";
 
 const GITHUB_URL = "https://github.com/tinycomputerai/bun-server-bench";
-const HF_URL = "https://huggingface.co/datasets/tinycomputerai/bun-server-bench-trajectories";
+const HF_URL =
+  "https://huggingface.co/datasets/tinycomputerai/bun-server-bench-trajectories";
 
 // Rich landing-page README for the published Harbor dataset. `harbor init`
 // writes only a bare title, so we overwrite it on every regeneration.
@@ -74,7 +75,10 @@ const DEFAULT_OUT_ROOT = "harbor";
 
 function harborAvailable(): boolean {
   try {
-    const check = Bun.spawnSync(["uvx", "harbor", "--version"], { stdout: "ignore", stderr: "ignore" });
+    const check = Bun.spawnSync(["uvx", "harbor", "--version"], {
+      stdout: "ignore",
+      stderr: "ignore",
+    });
     return check.exitCode === 0;
   } catch {
     return false;
@@ -82,7 +86,10 @@ function harborAvailable(): boolean {
 }
 
 function runHarbor(args: string[]): void {
-  const proc = Bun.spawnSync(["uvx", "harbor", ...args], { stdout: "inherit", stderr: "inherit" });
+  const proc = Bun.spawnSync(["uvx", "harbor", ...args], {
+    stdout: "inherit",
+    stderr: "inherit",
+  });
   if (proc.exitCode !== 0) {
     throw new Error(`uvx harbor ${args[0]} failed (exit ${proc.exitCode})`);
   }
@@ -105,7 +112,7 @@ export function syncDataset(outRoot = DEFAULT_OUT_ROOT): boolean {
   if (!harborAvailable()) {
     console.warn(
       "[harbor] dataset.toml not regenerated: harbor CLI (uvx harbor) unavailable. " +
-        "Run `bun run harbor:dataset` once uv/harbor is installed.",
+        "Run `bun run harbor:dataset` once uv/harbor is installed."
     );
     return false;
   }
@@ -135,7 +142,9 @@ export function syncDataset(outRoot = DEFAULT_OUT_ROOT): boolean {
   // committed manifest's digests match the packages).
   runHarbor(["sync", datasetToml]);
 
-  console.log(`[harbor] regenerated ${datasetToml} + README.md (${DATASET_NAME})`);
+  console.log(
+    `[harbor] regenerated ${datasetToml} + README.md (${DATASET_NAME})`
+  );
   return true;
 }
 

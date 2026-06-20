@@ -4,11 +4,11 @@ Point your coding agent at bun-server-bench, get a score per task, and see exact
 
 ## Pick a runner
 
-| Runner | Use it for | Command |
-| --- | --- | --- |
-| Local agent runner | Fast iteration, adapter development | `bun run run:agent` |
-| Local suite runner | Batch evaluation across all tasks | `bun run run:suite` |
-| Harbor | Containerized, reproducible, publishable runs | `harbor run` |
+| Runner             | Use it for                                    | Command             |
+| ------------------ | --------------------------------------------- | ------------------- |
+| Local agent runner | Fast iteration, adapter development           | `bun run run:agent` |
+| Local suite runner | Batch evaluation across all tasks             | `bun run run:suite` |
+| Harbor             | Containerized, reproducible, publishable runs | `harbor run`        |
 
 The local runners are the quick path. [Harbor](../reference/harbor.md) is the canonical execution environment — it runs each task in a sealed container with the network disabled and the hidden verifier injected only at scoring time, so a Harbor score is the one you publish.
 
@@ -22,13 +22,13 @@ bun run run:agent \
 
 The runner writes a fresh workspace, invokes the agent, starts the submitted service, probes readiness, runs public then hidden tests, and writes the score. Swap `--agent` for any supported adapter:
 
-| Agent ID | Status | Notes |
-| --- | --- | --- |
-| `claude-code` | Implemented | Claude Code CLI (`claude -p`) |
-| `codex-cli` | Implemented | `codex exec` |
-| `gpt-5` | Implemented | Codex CLI harness pinned to `gpt-5` |
-| `aider` | Planned | — |
-| `opencode` | Planned | — |
+| Agent ID      | Status      | Notes                               |
+| ------------- | ----------- | ----------------------------------- |
+| `claude-code` | Implemented | Claude Code CLI (`claude -p`)       |
+| `codex-cli`   | Implemented | `codex exec`                        |
+| `gpt-5`       | Implemented | Codex CLI harness pinned to `gpt-5` |
+| `aider`       | Planned     | —                                   |
+| `opencode`    | Planned     | —                                   |
 
 All implemented adapters share the same materialization, prompt construction, scoring lifecycle, and result schema, so scores are comparable across them. Authenticate the underlying CLI first (`claude auth`, `codex login`).
 

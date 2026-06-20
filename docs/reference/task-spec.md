@@ -12,7 +12,6 @@ Task authors, maintainers, and integration builders who need exact schema and sc
 
 Required task fields, lifecycle rules, scoring metadata, hidden-test requirements, and anti-gaming guidance.
 
-
 Status: draft
 Spec version: 0.1.0
 Audience: task authors, generator authors, validator authors, runner authors, Harbor adapter maintainers
@@ -519,7 +518,7 @@ Rules:
 
 Scoring formula and gates.
 
-> **Live vs. spec scoring.** The weighted formula below is the *normative target*
+> **Live vs. spec scoring.** The weighted formula below is the _normative target_
 > of this schema. It is **not** what the current runner computes. Today every
 > task is scored by the gate model (100 / 25 / 0) realized in the Harbor verifier
 > and the local runners. The `weights`, `performance`, and `dependency_budget`

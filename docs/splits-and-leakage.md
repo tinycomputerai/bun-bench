@@ -6,21 +6,21 @@ A benchmark that doubles as a training dataset has to defend a hard line between
 
 Every task declares `dataset.split` in `task.yaml`.
 
-| Split | Intended use | Default export behavior |
-| --- | --- | --- |
-| `train` | Training trajectories — intentionally part of the training distribution | Included |
-| `dev` | Development, debugging, ablations, non-final iteration | Included |
-| `public_eval` | Public comparison; prompts/tests may be visible, trajectories should not train | Excluded unless `--allow-public-eval` |
-| `private_eval` | Held-out evaluation | Excluded unless `--allow-private-eval`; normally `trainable: false` |
+| Split          | Intended use                                                                   | Default export behavior                                             |
+| -------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `train`        | Training trajectories — intentionally part of the training distribution        | Included                                                            |
+| `dev`          | Development, debugging, ablations, non-final iteration                         | Included                                                            |
+| `public_eval`  | Public comparison; prompts/tests may be visible, trajectories should not train | Excluded unless `--allow-public-eval`                               |
+| `private_eval` | Held-out evaluation                                                            | Excluded unless `--allow-private-eval`; normally `trainable: false` |
 
 Current distribution:
 
-| Split | Tasks |
-| --- | ---: |
-| `train` | 4 |
-| `dev` | 44 |
-| `public_eval` | 0 |
-| `private_eval` | 2 |
+| Split          | Tasks |
+| -------------- | ----: |
+| `train`        |     4 |
+| `dev`          |    44 |
+| `public_eval`  |     0 |
+| `private_eval` |     2 |
 
 `train` and `dev` are both trainable today, but treat them differently: `train` is the deliberate training distribution; `dev` is for iteration, agent debugging, and ablations, not final held-out scoring. `public_eval` exists for visible head-to-head comparison without feeding trajectories back into training. `private_eval` is the held-out set — excluded from routine export and marked non-trainable so it cannot leak. The two current private-eval tasks (e.g. `http.conditional-cache-semantics.v1`, `websockets.backpressure-ordering.v1`) are the held-out signal.
 
@@ -39,7 +39,7 @@ Current distribution:
 `dataset.trainable` is an explicit guardrail layered on top of splits:
 
 - `trainable: true` — successful runs may be exported when split rules allow.
-- `trainable: false` — the task is excluded from normal training exports *even if* a flag would otherwise include its split.
+- `trainable: false` — the task is excluded from normal training exports _even if_ a flag would otherwise include its split.
 
 48 of 50 tasks are trainable; the 2 private-eval tasks are not. Never pair `private_eval` with `trainable: true`.
 

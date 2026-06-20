@@ -12,10 +12,11 @@ export type RunStatus =
 
 export type PhaseOutcome = "passed" | "failed" | "skipped";
 
-export type TaskConfig = {
+export interface TaskConfig {
+  dependencies: {
+    install_command: string;
+  };
   id: string;
-  spec_version: string;
-  task_version: string;
   interfaces: {
     process: {
       start_command: string;
@@ -26,6 +27,11 @@ export type TaskConfig = {
       };
     };
   };
+  scoring: {
+    max_score: number;
+  };
+  spec_version: string;
+  task_version: string;
   tests: {
     public: { command: string };
     hidden: { command: string };
@@ -37,40 +43,9 @@ export type TaskConfig = {
     test_seconds: number;
     total_seconds: number;
   };
-  dependencies: {
-    install_command: string;
-  };
-  scoring: {
-    max_score: number;
-  };
-};
+}
 
-export type RunResult = {
-  task_id: string;
-  task_version: string;
-  spec_version: string;
-  run_id: string;
-  mode: RunMode;
-  status: RunStatus;
-  score: number;
-  max_score: number;
-  started_at: string;
-  completed_at: string;
-  durations: {
-    install_ms: number;
-    start_ms: number;
-    readiness_ms: number;
-    public_tests_ms: number;
-    hidden_tests_ms: number;
-    total_ms: number;
-  };
-  outcome: {
-    install: PhaseOutcome;
-    start: PhaseOutcome;
-    readiness: PhaseOutcome;
-    public_tests: PhaseOutcome;
-    hidden_tests: PhaseOutcome;
-  };
+export interface RunResult {
   artifacts: {
     install_stdout: string;
     install_stderr: string;
@@ -81,11 +56,36 @@ export type RunResult = {
     hidden_tests_stdout: string;
     hidden_tests_stderr: string;
   };
+  completed_at: string;
+  durations: {
+    install_ms: number;
+    start_ms: number;
+    readiness_ms: number;
+    public_tests_ms: number;
+    hidden_tests_ms: number;
+    total_ms: number;
+  };
   error: string | null;
-};
+  max_score: number;
+  mode: RunMode;
+  outcome: {
+    install: PhaseOutcome;
+    start: PhaseOutcome;
+    readiness: PhaseOutcome;
+    public_tests: PhaseOutcome;
+    hidden_tests: PhaseOutcome;
+  };
+  run_id: string;
+  score: number;
+  spec_version: string;
+  started_at: string;
+  status: RunStatus;
+  task_id: string;
+  task_version: string;
+}
 
-export type CommandResult = {
+export interface CommandResult {
+  durationMs: number;
   exitCode: number;
   timedOut: boolean;
-  durationMs: number;
-};
+}

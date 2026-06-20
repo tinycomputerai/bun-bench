@@ -64,11 +64,11 @@ harbor/<sanitized-id>/
 (`BUN_SERVER_BENCH_APP_DIR=/app`), spawning the solution's server through the
 helper. It writes a float reward to `/logs/verifier/reward.txt`:
 
-| Outcome | `reward.txt` | bun-server-bench score |
-| --- | --- | ---: |
-| public pass **and** hidden pass | `1.0` | 100 |
-| public pass, hidden fail | `0.25` | 25 |
-| public fail (or earlier failure) | `0.0` | 0 |
+| Outcome                          | `reward.txt` | bun-server-bench score |
+| -------------------------------- | ------------ | ---------------------: |
+| public pass **and** hidden pass  | `1.0`        |                    100 |
+| public pass, hidden fail         | `0.25`       |                     25 |
+| public fail (or earlier failure) | `0.0`        |                      0 |
 
 The script exits non-zero unless the reward is `1.0`, so Harbor's pass/fail
 aligns with full correctness. This is the live scoring model in full — see
@@ -92,7 +92,7 @@ bun run harbor:tasks-lock
 bun run validate:tasks-lock --tasks 'tasks/**'
 ```
 
-Harbor *run outputs* (under `jobs/`) are gitignored; the packages themselves are
+Harbor _run outputs_ (under `jobs/`) are gitignored; the packages themselves are
 committed.
 
 ## Running a task
@@ -151,27 +151,27 @@ score for the same reference solution.
 
 ## Mapping: `task.yaml` → Harbor
 
-| bun-server-bench field | Harbor destination | Notes |
-| --- | --- | --- |
-| `id` | `task.name` = `tinycomputerai/bun-server-bench-<sanitized-id>`; `keywords` `id:<id>`; README; sidecar | Published under the `tinycomputerai` org as part of the `tinycomputerai/bun-server-bench` dataset. Harbor names are slugs, so dots → hyphens; the true id is preserved verbatim. |
-| `task_version`, `spec_version` | `keywords`; sidecar | Harbor versions packages via its registry; bun-server-bench versions ride as metadata. |
-| `title` | README; sidecar | |
-| `description` | `task.description` | Whitespace-collapsed. |
-| `category` | `keywords` `category:<c>`; `metadata.tags[0]`; sidecar | `metadata.category` is Harbor's `software_engineering`. |
-| `tags` | `metadata.tags` (deduped with category) | |
-| `difficulty.level` | `metadata.difficulty` (1–2→easy, 3→medium, 4–5→hard); `keywords`; sidecar | Numeric level preserved. |
-| `instruction` (prompt + appended constraints/assumptions/disallowed-shortcuts) | `instruction.md` | Built by the same `constructPrompt()` the local agent runner uses, so the prompt is identical. |
-| `tests.public` | `environment/app/tests/public` (visible) **and** `tests/public` (verifier) | |
-| `tests.hidden` | `tests/hidden` (runner-only) | Never baked into the agent image. |
-| `tests.helpers` | `environment/app/tests/helpers` **and** `tests/helpers` | |
-| `timeouts.test_seconds` | `verifier.timeout_sec` = `max(300, test_seconds*2+60)` | Verifier runs both suites sequentially. |
-| `timeouts.total_seconds` | `agent.timeout_sec` | |
-| `timeouts.install_seconds` | `environment.build_timeout_sec` = `max(600, install_seconds)` | |
-| `environment.network` | `environment.network_mode` (`disabled`→`no-network`, else `public`) | |
-| `dependencies` (zero-dep) | implicit | Bun ships in `oven/bun:1`; no install step emitted. Dependency-having tasks would add `RUN bun install`. |
-| `scoring` | sidecar + enforced by `test.sh` reward model | Gate scoring is realized as the reward; weights live in the sidecar (see [scoring.md](scoring.md)). |
-| `success_criteria` | sidecar | Reference/maintainer metadata. |
-| `solutions/reference/src/*` | `solution/solve.sh` (embedded heredocs) | Used by the `oracle` agent. |
+| bun-server-bench field                                                         | Harbor destination                                                                                    | Notes                                                                                                                                                                            |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                                                                           | `task.name` = `tinycomputerai/bun-server-bench-<sanitized-id>`; `keywords` `id:<id>`; README; sidecar | Published under the `tinycomputerai` org as part of the `tinycomputerai/bun-server-bench` dataset. Harbor names are slugs, so dots → hyphens; the true id is preserved verbatim. |
+| `task_version`, `spec_version`                                                 | `keywords`; sidecar                                                                                   | Harbor versions packages via its registry; bun-server-bench versions ride as metadata.                                                                                           |
+| `title`                                                                        | README; sidecar                                                                                       |                                                                                                                                                                                  |
+| `description`                                                                  | `task.description`                                                                                    | Whitespace-collapsed.                                                                                                                                                            |
+| `category`                                                                     | `keywords` `category:<c>`; `metadata.tags[0]`; sidecar                                                | `metadata.category` is Harbor's `software_engineering`.                                                                                                                          |
+| `tags`                                                                         | `metadata.tags` (deduped with category)                                                               |                                                                                                                                                                                  |
+| `difficulty.level`                                                             | `metadata.difficulty` (1–2→easy, 3→medium, 4–5→hard); `keywords`; sidecar                             | Numeric level preserved.                                                                                                                                                         |
+| `instruction` (prompt + appended constraints/assumptions/disallowed-shortcuts) | `instruction.md`                                                                                      | Built by the same `constructPrompt()` the local agent runner uses, so the prompt is identical.                                                                                   |
+| `tests.public`                                                                 | `environment/app/tests/public` (visible) **and** `tests/public` (verifier)                            |                                                                                                                                                                                  |
+| `tests.hidden`                                                                 | `tests/hidden` (runner-only)                                                                          | Never baked into the agent image.                                                                                                                                                |
+| `tests.helpers`                                                                | `environment/app/tests/helpers` **and** `tests/helpers`                                               |                                                                                                                                                                                  |
+| `timeouts.test_seconds`                                                        | `verifier.timeout_sec` = `max(300, test_seconds*2+60)`                                                | Verifier runs both suites sequentially.                                                                                                                                          |
+| `timeouts.total_seconds`                                                       | `agent.timeout_sec`                                                                                   |                                                                                                                                                                                  |
+| `timeouts.install_seconds`                                                     | `environment.build_timeout_sec` = `max(600, install_seconds)`                                         |                                                                                                                                                                                  |
+| `environment.network`                                                          | `environment.network_mode` (`disabled`→`no-network`, else `public`)                                   |                                                                                                                                                                                  |
+| `dependencies` (zero-dep)                                                      | implicit                                                                                              | Bun ships in `oven/bun:1`; no install step emitted. Dependency-having tasks would add `RUN bun install`.                                                                         |
+| `scoring`                                                                      | sidecar + enforced by `test.sh` reward model                                                          | Gate scoring is realized as the reward; weights live in the sidecar (see [scoring.md](scoring.md)).                                                                              |
+| `success_criteria`                                                             | sidecar                                                                                               | Reference/maintainer metadata.                                                                                                                                                   |
+| `solutions/reference/src/*`                                                    | `solution/solve.sh` (embedded heredocs)                                                               | Used by the `oracle` agent.                                                                                                                                                      |
 
 ## Unsupported / lossy fields
 

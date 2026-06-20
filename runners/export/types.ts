@@ -1,48 +1,48 @@
 export type DatasetSplit = "train" | "dev" | "public_eval" | "private_eval";
 
-export type TaskDatasetMetadata = {
-  split: DatasetSplit;
+export interface TaskDatasetMetadata {
   leakage_group: string;
+  split: DatasetSplit;
   trainable: boolean;
-};
+}
 
-export type ExportRunResult = {
-  task_id: string;
-  task_version: string;
-  spec_version: string;
-  run_id: string;
+export interface ExportRunResult {
   agent_id?: string;
-  mode?: string;
-  status: string;
-  score: number;
-  max_score: number;
-  started_at: string;
   completed_at: string;
   durations?: {
     total_ms?: number;
     agent_ms?: number;
   };
+  max_score: number;
   metrics?: {
     wall_time_ms?: number;
     input_tokens?: number;
     output_tokens?: number;
     tool_calls?: number;
   };
-};
+  mode?: string;
+  run_id: string;
+  score: number;
+  spec_version: string;
+  started_at: string;
+  status: string;
+  task_id: string;
+  task_version: string;
+}
 
-export type SolutionPatch = {
-  patch: string;
+export interface SolutionPatch {
   files_changed: string[];
-};
+  patch: string;
+}
 
-export type ExportOptions = {
-  runsPattern: string;
-  outPath: string;
-  minScore: number;
-  allowPublicEval: boolean;
+export interface ExportOptions {
   allowPrivateEval: boolean;
+  allowPublicEval: boolean;
+  minScore: number;
+  outPath: string;
+  runsPattern: string;
   tasksRoot?: string;
-};
+}
 
 export type ExportSkipReason =
   | "missing_result"
@@ -59,14 +59,14 @@ export type ExportSkipReason =
   | "reference_solution"
   | "hidden_tests_in_patch";
 
-export type ExportSummary = {
+export interface ExportSummary {
   discovered: number;
   exported: number;
-  skipped: Record<ExportSkipReason, number>;
   out_path: string;
-};
+  skipped: Record<ExportSkipReason, number>;
+}
 
-export type SftRecord = {
+export interface SftRecord {
   messages: Array<{
     role: "system" | "user" | "assistant";
     content: string;
@@ -84,18 +84,18 @@ export type SftRecord = {
       leakage_group: string;
     };
   };
-};
+}
 
-export type PatchRecord = {
-  task_id: string;
-  run_id: string;
-  prompt: string;
-  patch: string;
-  files_changed: string[];
-  score: number;
+export interface PatchRecord {
   agent_id: string;
   dataset: {
     split: DatasetSplit;
     leakage_group: string;
   };
-};
+  files_changed: string[];
+  patch: string;
+  prompt: string;
+  run_id: string;
+  score: number;
+  task_id: string;
+}

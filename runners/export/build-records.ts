@@ -3,7 +3,10 @@ import type { PreparedRun } from "./prepare-run";
 import type { PatchRecord, SftRecord } from "./types";
 
 export function buildSftRecord(prepared: PreparedRun): SftRecord {
-  const durationMs = prepared.result.durations?.total_ms ?? prepared.result.metrics?.wall_time_ms ?? 0;
+  const durationMs =
+    prepared.result.durations?.total_ms ??
+    prepared.result.metrics?.wall_time_ms ??
+    0;
 
   return {
     messages: [

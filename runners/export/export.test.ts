@@ -1,3 +1,4 @@
+import { describe, expect, test } from "bun:test";
 import {
   cpSync,
   existsSync,
@@ -8,11 +9,13 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
-import { describe, expect, test } from "bun:test";
 import { exportPatchDataset, exportSftDataset } from "./export-dataset";
 import { parseExportArgs } from "./parse-args";
 import { prepareRunForExport, splitExportSkipReason } from "./prepare-run";
-import { extractSolutionPatch, matchesReferenceSolution } from "./solution-patch";
+import {
+  extractSolutionPatch,
+  matchesReferenceSolution,
+} from "./solution-patch";
 import type { DatasetSplit } from "./types";
 
 const repoRoot = resolve(import.meta.dir, "../..");
@@ -28,7 +31,7 @@ const defaultExportOptions = {
 function createSplitFixture(
   rootDir: string,
   split: DatasetSplit,
-  trainable: boolean,
+  trainable: boolean
 ): { tasksRoot: string; runDir: string; taskId: string } {
   const taskId = `export.test.${split}.v1`;
   const tasksRoot = join(rootDir, "tasks");
@@ -54,16 +57,16 @@ function createSplitFixture(
       `  trainable: ${trainable}`,
       "instruction:",
       "  prompt_file: prompt.md",
-    ].join("\n"),
+    ].join("\n")
   );
   writeFileSync(join(taskPath, "prompt.md"), "# Export split fixture\n");
   writeFileSync(
     join(taskPath, "src/server.ts"),
-    readFileSync(join(taskDir, "src/server.ts"), "utf8"),
+    readFileSync(join(taskDir, "src/server.ts"), "utf8")
   );
   writeFileSync(
     join(taskPath, "package.json"),
-    readFileSync(join(taskDir, "package.json"), "utf8"),
+    readFileSync(join(taskDir, "package.json"), "utf8")
   );
 
   writeFileSync(
@@ -83,16 +86,19 @@ function createSplitFixture(
       durations: { total_ms: 1000 },
       metrics: { wall_time_ms: 1000, input_tokens: 10, output_tokens: 10 },
       error: null,
-    }),
+    })
   );
-  writeFileSync(join(runDir, "logs/agent-prompt.md"), "# Export split fixture\n");
+  writeFileSync(
+    join(runDir, "logs/agent-prompt.md"),
+    "# Export split fixture\n"
+  );
   writeFileSync(
     join(runDir, "workspace/src/server.ts"),
-    readFileSync(join(fixtureRunDir, "workspace/src/server.ts"), "utf8"),
+    readFileSync(join(fixtureRunDir, "workspace/src/server.ts"), "utf8")
   );
   writeFileSync(
     join(runDir, "workspace/package.json"),
-    readFileSync(join(fixtureRunDir, "workspace/package.json"), "utf8"),
+    readFileSync(join(fixtureRunDir, "workspace/package.json"), "utf8")
   );
 
   return { tasksRoot, runDir, taskId };
@@ -100,7 +106,10 @@ function createSplitFixture(
 
 describe("solution patch extraction", () => {
   test("extracts a unified diff from starter to workspace", () => {
-    const patch = extractSolutionPatch(taskDir, join(fixtureRunDir, "workspace"));
+    const patch = extractSolutionPatch(
+      taskDir,
+      join(fixtureRunDir, "workspace")
+    );
     expect(patch).not.toBeNull();
     expect(patch?.files_changed).toContain("src/server.ts");
     expect(patch?.patch).toContain("--- a/src/server.ts");
@@ -110,7 +119,9 @@ describe("solution patch extraction", () => {
   test("detects reference solution matches", () => {
     const referenceWorkspace = join(taskDir, "solutions/reference");
     expect(matchesReferenceSolution(taskDir, referenceWorkspace)).toBe(true);
-    expect(matchesReferenceSolution(taskDir, join(fixtureRunDir, "workspace"))).toBe(false);
+    expect(
+      matchesReferenceSolution(taskDir, join(fixtureRunDir, "workspace"))
+    ).toBe(false);
   });
 });
 
@@ -121,15 +132,23 @@ describe("split export policy", () => {
   });
 
   test("excludes eval splits unless explicitly allowed", () => {
-    expect(splitExportSkipReason("public_eval", defaultExportOptions)).toBe("public_eval_excluded");
+    expect(splitExportSkipReason("public_eval", defaultExportOptions)).toBe(
+      "public_eval_excluded"
+    );
     expect(splitExportSkipReason("private_eval", defaultExportOptions)).toBe(
-      "private_eval_excluded",
+      "private_eval_excluded"
     );
     expect(
-      splitExportSkipReason("public_eval", { ...defaultExportOptions, allowPublicEval: true }),
+      splitExportSkipReason("public_eval", {
+        ...defaultExportOptions,
+        allowPublicEval: true,
+      })
     ).toBeNull();
     expect(
-      splitExportSkipReason("private_eval", { ...defaultExportOptions, allowPrivateEval: true }),
+      splitExportSkipReason("private_eval", {
+        ...defaultExportOptions,
+        allowPrivateEval: true,
+      })
     ).toBeNull();
   });
 });
@@ -143,7 +162,9 @@ describe("run export filters", () => {
 
     expect(skipReason).toBeNull();
     expect(prepared?.dataset.split).toBe("dev");
-    expect(prepared?.dataset.leakage_group).toBe("authentication.bearer-profile");
+    expect(prepared?.dataset.leakage_group).toBe(
+      "authentication.bearer-profile"
+    );
     expect(prepared?.prompt).toContain("Bearer Token Profile Endpoint");
     expect(prepared?.filesChanged).toContain("src/server.ts");
   });
@@ -183,7 +204,11 @@ describe("run export filters", () => {
   test("skips public_eval split runs unless allowed", async () => {
     const tempDir = mkdtempSync(join(import.meta.dir, ".tmp-export-"));
     try {
-      const { tasksRoot, runDir } = createSplitFixture(tempDir, "public_eval", false);
+      const { tasksRoot, runDir } = createSplitFixture(
+        tempDir,
+        "public_eval",
+        false
+      );
       const blocked = await prepareRunForExport(runDir, {
         ...defaultExportOptions,
         tasksRoot,
@@ -204,7 +229,11 @@ describe("run export filters", () => {
   test("exports public_eval split runs when allowed and trainable", async () => {
     const tempDir = mkdtempSync(join(import.meta.dir, ".tmp-export-"));
     try {
-      const { tasksRoot, runDir } = createSplitFixture(tempDir, "public_eval", true);
+      const { tasksRoot, runDir } = createSplitFixture(
+        tempDir,
+        "public_eval",
+        true
+      );
       const { prepared, skipReason } = await prepareRunForExport(runDir, {
         ...defaultExportOptions,
         allowPublicEval: true,
@@ -221,7 +250,11 @@ describe("run export filters", () => {
   test("exports private_eval split runs when allowed and trainable", async () => {
     const tempDir = mkdtempSync(join(import.meta.dir, ".tmp-export-"));
     try {
-      const { tasksRoot, runDir } = createSplitFixture(tempDir, "private_eval", true);
+      const { tasksRoot, runDir } = createSplitFixture(
+        tempDir,
+        "private_eval",
+        true
+      );
       const { prepared, skipReason } = await prepareRunForExport(runDir, {
         ...defaultExportOptions,
         allowPrivateEval: true,
@@ -238,7 +271,11 @@ describe("run export filters", () => {
   test("skips private_eval split runs unless allowed", async () => {
     const tempDir = mkdtempSync(join(import.meta.dir, ".tmp-export-"));
     try {
-      const { tasksRoot, runDir } = createSplitFixture(tempDir, "private_eval", false);
+      const { tasksRoot, runDir } = createSplitFixture(
+        tempDir,
+        "private_eval",
+        false
+      );
       const blocked = await prepareRunForExport(runDir, {
         ...defaultExportOptions,
         tasksRoot,
@@ -266,7 +303,7 @@ describe("run export filters", () => {
           mode: "reference",
           status: "completed",
           score: 100,
-        }),
+        })
       );
 
       const { skipReason } = await prepareRunForExport(tempDir, {
@@ -291,7 +328,7 @@ describe("run export filters", () => {
           agent_id: "fixture-agent",
           status: "completed",
           score: 75,
-        }),
+        })
       );
 
       const { skipReason } = await prepareRunForExport(tempDir, {
@@ -327,7 +364,10 @@ describe("dataset export commands", () => {
     const tempDir = mkdtempSync(join(import.meta.dir, ".tmp-export-out-"));
     const runsRoot = join(tempDir, "runs");
     const outRoot = join(tempDir, "out");
-    const copiedRunDir = join(runsRoot, "fixture-successful-authentication.bearer-profile.v1");
+    const copiedRunDir = join(
+      runsRoot,
+      "fixture-successful-authentication.bearer-profile.v1"
+    );
 
     try {
       cpSync(fixtureRunDir, copiedRunDir, { recursive: true });
@@ -360,8 +400,12 @@ describe("dataset export commands", () => {
 
       const sftRecord = JSON.parse(readFileSync(sftOut, "utf8").trim());
       expect(sftRecord.messages).toHaveLength(3);
-      expect(sftRecord.metadata.task_id).toBe("authentication.bearer-profile.v1");
-      expect(sftRecord.metadata.dataset.leakage_group).toBe("authentication.bearer-profile");
+      expect(sftRecord.metadata.task_id).toBe(
+        "authentication.bearer-profile.v1"
+      );
+      expect(sftRecord.metadata.dataset.leakage_group).toBe(
+        "authentication.bearer-profile"
+      );
       expect(sftRecord.messages[2].content).toContain("src/server.ts");
 
       const patchRecord = JSON.parse(readFileSync(patchOut, "utf8").trim());

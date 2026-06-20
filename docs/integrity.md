@@ -1,12 +1,12 @@
 # Benchmark integrity
 
-A benchmark is only worth its score if the score is hard to fake. The first question a careful evaluator asks is: *could an agent pass without actually solving the task?* This page is the answer. Every guarantee below is enforced mechanically, not by convention.
+A benchmark is only worth its score if the score is hard to fake. The first question a careful evaluator asks is: _could an agent pass without actually solving the task?_ This page is the answer. Every guarantee below is enforced mechanically, not by convention.
 
 ## Hidden tests are physically separated
 
 The hidden suite is the discriminating signal, so it never enters the agent's reach.
 
-**Locally.** Public tests run from the materialized agent workspace. Hidden tests run from the original task package, *outside* that workspace, with `BUN_SERVER_BENCH_APP_DIR` pointing the test helpers at the submitted service. The agent can read, edit, and delete everything in its workspace and still never touch a hidden test, because the hidden tests aren't there.
+**Locally.** Public tests run from the materialized agent workspace. Hidden tests run from the original task package, _outside_ that workspace, with `BUN_SERVER_BENCH_APP_DIR` pointing the test helpers at the submitted service. The agent can read, edit, and delete everything in its workspace and still never touch a hidden test, because the hidden tests aren't there.
 
 **In Harbor.** `environment/app/` is baked into the Docker image as the agent workspace. `tests/hidden/` is injected only at verification time, after the agent is done. `tests/test.sh` runs the public and hidden suites and writes `reward.txt`. See **[reference/harbor.md](reference/harbor.md)**.
 
@@ -14,7 +14,7 @@ The agent sees the prompt, the starter `src/`, the package files, the public tes
 
 ## No escape hatches
 
-The traps test whether the agent can *implement* a capability — so the environment removes every way to avoid implementing it.
+The traps test whether the agent can _implement_ a capability — so the environment removes every way to avoid implementing it.
 
 - **Zero runtime dependencies.** Every task ships with an empty dependency allowlist. The agent builds on native `Bun.serve`, `bun:sqlite`, and `node:crypto` — it cannot `npm install` a library that already solved the problem.
 - **Network denied during install and tests.** `bun install --no-save` runs with networking off. This removes install flakiness and forecloses fetching a solution at runtime.
@@ -38,4 +38,4 @@ The full split policy is in **[splits-and-leakage.md](splits-and-leakage.md)**.
 
 ## What integrity does not claim
 
-These guarantees make the *score* trustworthy. They do not make the benchmark immune to a determined task author shipping a weak hidden suite — that is what the three-invariant acceptance bar in **[task-anatomy.md](task-anatomy.md)** defends, and what task review enforces. Integrity here means: a passing score reflects a service that satisfies the contract under tests the agent could not see, build around, or fetch its way past.
+These guarantees make the _score_ trustworthy. They do not make the benchmark immune to a determined task author shipping a weak hidden suite — that is what the three-invariant acceptance bar in **[task-anatomy.md](task-anatomy.md)** defends, and what task review enforces. Integrity here means: a passing score reflects a service that satisfies the contract under tests the agent could not see, build around, or fetch its way past.

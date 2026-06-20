@@ -2,6 +2,9 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { validateTaskDirectory } from "../../validators/validate-task";
 
+const BACKSLASH_RE = /\\/g;
+const TRAILING_SLASHES_RE = /\/+$/;
+
 export async function discoverTasks(pattern: string): Promise<string[]> {
   const cwd = process.cwd();
   const candidates = resolveTaskCandidates(pattern, cwd);
@@ -19,7 +22,9 @@ export async function discoverTasks(pattern: string): Promise<string[]> {
 }
 
 function resolveTaskCandidates(pattern: string, cwd: string): string[] {
-  const normalized = pattern.replace(/\\/g, "/").replace(/\/+$/, "");
+  const normalized = pattern
+    .replace(BACKSLASH_RE, "/")
+    .replace(TRAILING_SLASHES_RE, "");
 
   if (!normalized.includes("*")) {
     const absolute = resolve(cwd, normalized);
@@ -42,10 +47,16 @@ function resolveTaskCandidates(pattern: string, cwd: string): string[] {
 
 function resolveTasksRoot(pattern: string, cwd: string): string {
   const wildcardIndex = pattern.indexOf("*");
-  const prefix = pattern.slice(0, wildcardIndex).replace(/\/+$/, "");
+  const prefix = pattern
+    .slice(0, wildcardIndex)
+    .replace(TRAILING_SLASHES_RE, "");
   const absolutePrefix = resolve(cwd, prefix || ".");
 
-  if (basename(absolutePrefix) === "tasks" || prefix.endsWith("/tasks") || prefix === "tasks") {
+  if (
+    basename(absolutePrefix) === "tasks" ||
+    prefix.endsWith("/tasks") ||
+    prefix === "tasks"
+  ) {
     return absolutePrefix;
   }
 

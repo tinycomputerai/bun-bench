@@ -12,201 +12,201 @@ name = "tincomputer.ai"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-authentication-bearer-profile-v1"
-digest = "sha256:f55e631c13e37e71c50aa3de67c543c9358e3443465789965ce0c609cca93c4e"
+digest = "sha256:a6134736720195c8f4533cc76bd828d67c793d76318a097924882f5a5a682348"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-authentication-jwt-key-rotation-v1"
-digest = "sha256:742fa8f75ee18c0ef5acbfcd58590f2b996061401776d9f283f670b47d50fd0f"
+digest = "sha256:c398acbc7bf442f1bcb27321ac7ef5b73d5e6f82ddece5a3ef5f684775623661"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-authentication-jwt-refresh-rotation-v1"
-digest = "sha256:7d44a5db4419f1bad96f08ded014d1b7dcb1e84947639ed2b3b2f3ccaf6f29a0"
+digest = "sha256:4296a749d014bf378ecf3af19a91bbe650254b0be1f0af494f9fcebd01d28e31"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-authentication-jwt-verify-v1"
-digest = "sha256:89bdb99d2824aa0a51ea35df057074ce352a9eb5cdd0e3e2621094e699232740"
+digest = "sha256:669c3e35fbe265e72cc0c875156631477bacb5a917bf34c5511e61af931f5ed1"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-authorization-confused-deputy-v1"
-digest = "sha256:b1002634ce3d51fa0f9b6b47af93748c9d3ff3e806917573169c285eed1f42a8"
+digest = "sha256:8c6379f48fab86c7b4ee8f8d4a1d81fac20ce4b83212e4f75f7c1de1208fa702"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-authorization-rbac-roles-v1"
-digest = "sha256:596e9cead4f877d78b56e04538f2c34855ed8d98211ea399ede06333015322c9"
+digest = "sha256:a9c09e1322de2d0896a2af2c5f7c51a5a8d2dc447ea7c5f52b9fd64b2213086c"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-authorization-scoped-tokens-v1"
-digest = "sha256:b95a791cd3a2c3a397b8e43c75df5055922e4bae5a4f51d4604a5f7209fe84fc"
+digest = "sha256:bcfb58be87b8d1eae4ec87fcdb6b1005111a8f391fe8336df9ff059d7c41d7ae"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-background-jobs-cron-exactly-once-v1"
-digest = "sha256:9f1bcf7146ef1d26cc5d0f2f06c6d089e6a7235be567c7247ab7e4112a57701d"
+digest = "sha256:bda13bbde30ad487a7718f1786a7731aca7665ddc3e58d2dc5fb007217789e01"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-background-jobs-retry-queue-v1"
-digest = "sha256:737de1b6f9c61c96b847ad03ad8641f68708a2fba101d6889c7474a78a24e813"
+digest = "sha256:65ec5fde8abf6bd56fe7d671f8134ee368384d537d5c32e368ec2d5b43a3ce86"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-background-jobs-simple-status-v1"
-digest = "sha256:830471b3cb1e715343100e0b18da9f0f8c07c3336b3507c4335e61b4264a0d0c"
+digest = "sha256:5f13ada80a6f01779397052d494540f08c910dd3dc6115d40791f7f004ff2647"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-caching-cache-stampede-v1"
-digest = "sha256:f6938e74a6b4017de800e53889c233c90d760b30cb18875813b29e7cc1faa243"
+digest = "sha256:2c4763fcd51080bc8ebe0a9dc1fd83b5cea3e168986657b2d1eda50dbc08f4e9"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-concurrency-lock-ordering-deadlock-v1"
-digest = "sha256:59b8cb808af652d91a7474d38a5eb6a1ef4f76b465fbc5c9d720df397932364f"
+digest = "sha256:74904bd749d3da0a1c417497c9a11437464b65384c9d19e4bddfc69c202a5c2d"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-crud-systems-etag-concurrency-v1"
-digest = "sha256:6004ad2b90535a4a1b623392b474feaf224a9e96eac7d29e44907451c3c5b033"
+digest = "sha256:b92f8384114aca9905ab1ec3c2df663da8acc670fae5d61516320dffc57480ba"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-crud-systems-memory-notes-v1"
-digest = "sha256:a91ce02d972838c5546a15475248da8d8da0078592671f1e15404b2cd6e540d3"
+digest = "sha256:78451b24701d460bdcc6a91bd653e223d927beff0378241270c1350d363bb543"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-databases-online-migration-backfill-v1"
-digest = "sha256:ff8491f0c9ac462923a3d1c201a97bb486566286074b9d1101ccae463072e12e"
+digest = "sha256:6337363d0efac5a5de5b1973ea9c52d5d622211d4569f637ea9dac0cc7244a44"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-databases-optimistic-version-v1"
-digest = "sha256:6f61458a558b0fc9edd4230fc2ee04ec21c23076beb402c60b475d5160dcca0e"
+digest = "sha256:7d9f0dd5f5acbea16db022ee60dcee8d86ba0946f738cd9a6825688f3e7f03df"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-databases-sqlite-ledger-v1"
-digest = "sha256:b925f9fa3564de274ff119a0599f35b5f6754463c8b0436adaa46a681ecabd35"
+digest = "sha256:1dd3695d4ba88d250954dc4f82aa9f5d3a4bc788e74f41f9ab660739eda4ac5e"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-databases-sqlite-migrations-v1"
-digest = "sha256:e728080429ab58ef1755c04df5323d54921846e970278e0011d4ed5b1224475b"
+digest = "sha256:5c1b9d1da73c8c29213f9fc09be9c2c7a4eb2f7ac72a1b61328a3054d2ba3132"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-databases-write-skew-isolation-v1"
-digest = "sha256:3aeb56d4c687bd2a8cf0400f84136bbefd5219b59513de3dc498bcb558b4d1d0"
+digest = "sha256:2a673dbe829bb91701159b3aa0a3581e296a4ae660d65c24a385620685cae033"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-error-handling-circuit-breaker-v1"
-digest = "sha256:6e246d2c5933dd07f8119d3f78cac95bdb13c14c23138b84f910b8484756db07"
+digest = "sha256:8cf29ebd6f8a0d9eff1043e8381d379b3b659a8be5b2c7810d468de8e0dbd8ec"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-error-handling-safe-error-v1"
-digest = "sha256:30c3014aeba24fe2dff8e851b38d137fc62277bda7e204389a7cff50ab06da50"
+digest = "sha256:1d98aa22f630fc184469907ca466ff68dd4ff259e399885d52a7af6c6dc49bc5"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-event-sourcing-idempotent-projection-v1"
-digest = "sha256:0c753c86aa03ab9f28f118bf7a8a392c1a75fba0645594ea65dab0a38da0faf6"
+digest = "sha256:a07434d8d1c9a450406b55144a4a65df962ee30b1c808ce461e8be6936ac17fc"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-file-uploads-multipart-checksum-v1"
-digest = "sha256:de573d39648d2d3c22ea3d8673c81a29013f94f843d30adb5c89896074aba025"
+digest = "sha256:848c376a815135593cc03108c53b0f8295d4748a20e9d99f9380cac2b85d30fe"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-file-uploads-resumable-chunks-v1"
-digest = "sha256:5ae56a32665afdf54a35a9420ef60c66ee8478b2a69adfb2da3468485f3c1b50"
+digest = "sha256:2f3cf47ec7fd9a0e703298c8b9724b4e51407414455fb3d7849840acd466f514"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-file-uploads-text-bytes-v1"
-digest = "sha256:25f08415f8c8e1f978874a28b7d6c85aba0d09f349c9918ab2fe75b7b7c317d8"
+digest = "sha256:aeea852bbd2103f5997bf80ad075eb0b8ab4183a75a2e3d70e9bef4806956254"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-http-apis-json-echo-v1"
-digest = "sha256:910406951127890fb8e41cbfc88c0fd2bcf743a253317ede3742ca72c13571c2"
+digest = "sha256:7d8ecaa2480410b7122ccd853ef0c08b663a8c1b7f934f76b541daf8c02e29a9"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-http-apis-todo-health-v1"
-digest = "sha256:af50fae4d35d089a3a6f244f6bd20050ab3eb0f235687f07d8ca93590f41f488"
+digest = "sha256:1eabac81b9e1d8e202ed92198b481aa78352dd14c5f90b80366984e24b064940"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-http-conditional-cache-semantics-v1"
-digest = "sha256:8eb9b689499d84ef5bf92f88a26f5c87bad7ec81ada85d8242995af1bd6971e1"
+digest = "sha256:79586e331a47ba14804d09850e55da04d2eb30c9d3ee0912e199b62b9f357b4e"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-idempotency-dedup-conflict-v1"
-digest = "sha256:325c269a999c78aa5eee7afffad9630b98826de2fd0554308abcc4b62df04627"
+digest = "sha256:895b80a67ec3ebe62ad81ae79e7f750160f4a2ea3e569bdd2e39bb3c7c1c45c7"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-idempotency-exactly-once-webhook-v1"
-digest = "sha256:10c3feb952c764f93f7574f7091bd2fcf8b1f9936e81c75ea696df3e3ef9ba94"
+digest = "sha256:faadbe092e9e23347a76c93b397f55b33ad0b26979800fd45334d58584d70e89"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-idempotency-payment-capture-v1"
-digest = "sha256:9a8e67bc3b1b05c949bcd22d82cc26a1d622cd57f8a478daafce9a15cfcc9d34"
+digest = "sha256:585ca6f599eabb2823635e38cd3f5ff58f2bc10dd88c50d359730541606c8f4f"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-middleware-request-id-v1"
-digest = "sha256:2ab77f1870b7baf4da5a69c79fe1aa9195b7ce609bd4538a72fdade748031e42"
+digest = "sha256:2f344c5921ce706c161e4a2c907b0505908de4b111d1bc9d55e83ea20cc70b4b"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-observability-request-metrics-v1"
-digest = "sha256:fc15bcdc79f9fcd017bef3a3bb78735e6b67a6013e623f7e725f6ef1100fb0bd"
+digest = "sha256:7195264f77b95b15abd9e9f6a458ead3a51d5b7d17833c5d3cb4dd613f503143"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-observability-trace-context-propagation-v1"
-digest = "sha256:45d75819708f10045da0c5f694878679c4e2d5ed3c9dc22f0200bb750406b1bc"
+digest = "sha256:38b7cc86723211d8eae032599c7baa12bb2c8486b9613ca1b7f90fa58e5d6673"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-pagination-bidirectional-cursor-v1"
-digest = "sha256:cd2f46847a914ab3db999fb593b6aa8fb3558d5a539a3706cb9445200afbe382"
+digest = "sha256:d085eadb3d7de0aec49c442750b82582fee2c4f0822408a5ff421557c16587e0"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-pagination-consistent-snapshot-v1"
-digest = "sha256:c57f2cdd48b633f32b74dd8058018827b5f8a2458f28fee8229d3a21eddaa409"
+digest = "sha256:eec2397f01823fa61d8a66bf49fb95e68e1b38a87ae977f76e07d6eeb64925d6"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-pagination-keyset-feed-v1"
-digest = "sha256:119ca1fe7c7b3c385a96d0e41e7d861e1ace7e47fc6eea659b9308c7a3d121b6"
+digest = "sha256:6d872fa899eecde5d996a21fbe2a024d86abce2acd10f70ada0925da93e65051"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-queues-per-key-fifo-v1"
-digest = "sha256:4b6516aa6e99f0053f81f1c13443330e768d4480217e454b70ebc145b2710b4b"
+digest = "sha256:d578e4b020a99951360c94c1003b3fd519edfe299898f0aa3727173f593415b5"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-rate-limiting-client-window-v1"
-digest = "sha256:de67c1bccd8196949b27e1920ab7b8528c7c62bbab45f33bf1ab4331fee0fdbe"
+digest = "sha256:80cc3d1a9cf27273d512727843b40944751df6791b5d1fff8ec81e574983eb4b"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-rate-limiting-distributed-fairness-v1"
-digest = "sha256:b66d001783c098e4ec8c9d598d8cea0e1c45029662257e3f5cd864935442d5a5"
+digest = "sha256:ed951da37e9aa0bde2ae3985c82b10ee4af6a04193035a28e49354fc5447564b"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-rate-limiting-sliding-window-v1"
-digest = "sha256:b1c994732b8762091df6505308a40f299816a6eff64a448b64ce2b6735baf449"
+digest = "sha256:5602d4c3b3364f0d49e24506c43bd6e3a97552e1fd53fd99a9405f3c7b4ed92d"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-rate-limiting-token-bucket-v1"
-digest = "sha256:d67ac86342879ed4a6018204b1a2494621235773821713ab9edfeb39d69f8005"
+digest = "sha256:0b113ef9f390e090dbb34c7a75acb7a9f843284bc0049e3c5387269e4f416a0f"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-retry-poison-message-budget-v1"
-digest = "sha256:047cda1f33848fdbb3ba3787a22764d6edf216ef5cdaef3ca7874bc09d670476"
+digest = "sha256:c3cb9dd00f7b0220b2808a3f5cf042a0ac8d2b85d718f105e4879ed140ef53a5"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-sagas-compensation-rollback-v1"
-digest = "sha256:a9b4a45e463a922dacd3ce625741562d001b3060c05a0581c42b1237a657ea9f"
+digest = "sha256:4d5fda2e33f4144e35171276723f20ad8253ac1e03b87f0588c29f3b86a41f3c"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-scheduling-dst-recurrence-v1"
-digest = "sha256:34825958c4eac6483fbaa1f0833a7b619a68db5592a3e5caf9d0967c5d4c5178"
+digest = "sha256:da3fd298ca2f6651b8011e744a92e5143a72c458ee514b5b00d8b529df9da8b7"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-security-signed-url-replay-v1"
-digest = "sha256:35cda10a76999f482d173d4a20c21ce3e1f632ecafd0f63d1f312ceb30256735"
+digest = "sha256:e1fff7db2bb80510f6b8347f585987e3d6d06d15303890b95579142ae40f29a7"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-validation-required-name-v1"
-digest = "sha256:e10abb516b4c4149b11c4aee1ab235571620ad748e0d7e71ebae6f1b3988b277"
+digest = "sha256:7c71ade57ae5412c947c4868282a9929eda209525c28739e6a530856f847d282"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-websockets-backpressure-ordering-v1"
-digest = "sha256:1e85af7ce215cdbbee6849d94f1f9721eb742e25de458d3c1b94e624e2d8e767"
+digest = "sha256:5c8caf078ce338c261ce87354a7a9733ecab59c29041a4250a01b806846b2361"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-websockets-presence-room-v1"
-digest = "sha256:aa740446ca4fe48c51a9a0c786105cbd04a0739487f855b6e22e69ee4ca514d0"
+digest = "sha256:c6d64047dfd20692374f85390b4add8a0a8024ab358de60b6adae5632428c44d"
 
 [[tasks]]
 name = "tinycomputerai/bun-server-bench-websockets-seqnum-resume-v1"
-digest = "sha256:2983ecc48a5b53a99cbe7086d9124432e5794d18c433e4e43c90b3214e7b6609"
+digest = "sha256:766f64a16bdf2a6dbb91a5ba3c706c757f19a6828ea5a9001b855d2ea45edc76"
 

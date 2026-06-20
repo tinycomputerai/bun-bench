@@ -93,7 +93,24 @@ function collectSolutionFiles(rootDir: string, label: string): FileSnapshot {
     throw new Error(`no starter solution files found under ${rootDir}`);
   }
 
+  // Strip lines that reference hidden tests or the reference solution (e.g.
+  // maintainer-only package.json scripts). Applied identically to the starter
+  // and workspace snapshots, so these lines never surface in the exported diff.
+  for (const [path, content] of files) {
+    files.set(path, stripForbiddenContent(content));
+  }
+
   return files;
+}
+
+function stripForbiddenContent(content: string): string {
+  if (!FORBIDDEN_EXPORT_SEGMENTS.some((segment) => content.includes(segment))) {
+    return content;
+  }
+  return content
+    .split("\n")
+    .filter((line) => !FORBIDDEN_EXPORT_SEGMENTS.some((segment) => line.includes(segment)))
+    .join("\n");
 }
 
 function collectDirectoryFiles(absoluteRoot: string, relativeRoot: string, files: FileSnapshot): void {

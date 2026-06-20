@@ -1,4 +1,17 @@
-# bun-bench Task Specification Contract
+# bun-server-bench Task Specification Contract
+
+## Why This Exists
+
+This is the normative task contract for authored benchmark tasks.
+
+## Who Should Read This
+
+Task authors, maintainers, and integration builders who need exact schema and scoring expectations.
+
+## What You'll Learn
+
+Required task fields, lifecycle rules, scoring metadata, hidden-test requirements, and anti-gaming guidance.
+
 
 Status: draft
 Spec version: 0.1.0
@@ -6,9 +19,9 @@ Audience: task authors, generator authors, validator authors, runner authors, Ha
 
 ## 1. Purpose
 
-This document defines the canonical task contract for `bun-bench`.
+This document defines the canonical task contract for `bun-server-bench`.
 
-`bun-bench` tasks evaluate whether a coding agent can build production-quality backend systems using Bun. A valid task must be:
+`bun-server-bench` tasks evaluate whether a coding agent can build production-quality backend systems using Bun. A valid task must be:
 
 - reproducible in an isolated execution environment
 - testable without human judgment
@@ -467,7 +480,7 @@ tests:
     command: bun test tests/metamorphic
     weight: 0.10
   mutation_policy:
-    seed_env: BUN_BENCH_SEED
+    seed_env: BUN_SERVER_BENCH_SEED
     deterministic: true
 ```
 
@@ -505,6 +518,13 @@ Rules:
 ### 6.16 `scoring`
 
 Scoring formula and gates.
+
+> **Live vs. spec scoring.** The weighted formula below is the *normative target*
+> of this schema. It is **not** what the current runner computes. Today every
+> task is scored by the gate model (100 / 25 / 0) realized in the Harbor verifier
+> and the local runners. The `weights`, `performance`, and `dependency_budget`
+> fields are a forward-looking contract that no scorer enforces yet. See
+> [scoring.md](scoring.md) for exactly which model is live.
 
 ```yaml
 scoring:
@@ -920,7 +940,7 @@ Rules:
 
 ## 13. Harbor Integration Contract
 
-Harbor is treated as the execution engine. Because the precise Harbor API may evolve, `bun-bench` MUST isolate Harbor-specific behavior behind an adapter.
+Harbor is treated as the execution engine. Because the precise Harbor API may evolve, `bun-server-bench` MUST isolate Harbor-specific behavior behind an adapter.
 
 ### 13.1 Harbor Adapter Responsibilities
 
@@ -1257,7 +1277,7 @@ tests:
     command: bun test tests/metamorphic
     weight: 0.10
   mutation_policy:
-    seed_env: BUN_BENCH_SEED
+    seed_env: BUN_SERVER_BENCH_SEED
     deterministic: true
 timeouts:
   install_seconds: 120

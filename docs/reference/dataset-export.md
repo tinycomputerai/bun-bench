@@ -1,21 +1,23 @@
 # Dataset Export
 
-Phase 6 turns successful agent runs into training artifacts for a tiny
+The exporters turn successful agent runs into training artifacts for a small
 specialized Bun backend model. Export is read-only: it scans existing run
-directories and writes JSONL files under `datasets/`.
+directories and writes JSONL files under `datasets/`. For the conceptual view of
+trajectories and how to use them, see
+[../guides/train-on-trajectories.md](../guides/train-on-trajectories.md).
 
 ## Commands
 
 Export supervised fine-tuning (SFT) chat records:
 
 ```sh
-bun run export:sft --runs 'runs/**' --out datasets/sft/bun-bench.jsonl
+bun run export:sft --runs 'runs/**' --out datasets/sft/bun-server-bench.jsonl
 ```
 
 Export patch-oriented records:
 
 ```sh
-bun run export:patches --runs 'runs/**' --out datasets/patches/bun-bench.jsonl
+bun run export:patches --runs 'runs/**' --out datasets/patches/bun-server-bench.jsonl
 ```
 
 Both commands accept the same options:
@@ -31,7 +33,7 @@ Both commands accept the same options:
 
 ## Input: Run Artifacts
 
-Exports read from the Phase 4 agent run layout documented in `docs/AGENTS.md`:
+Exports read from the agent run layout documented in [local-runners.md](local-runners.md):
 
 ```
 runs/<timestamp>-<task-id>/
@@ -127,15 +129,15 @@ task's `task.yaml` so downstream training pipelines can enforce split hygiene.
 2. Export training data from perfect runs:
 
    ```sh
-   bun run export:sft --runs 'runs/**' --out datasets/sft/bun-bench.jsonl
-   bun run export:patches --runs 'runs/**' --out datasets/patches/bun-bench.jsonl
+   bun run export:sft --runs 'runs/**' --out datasets/sft/bun-server-bench.jsonl
+   bun run export:patches --runs 'runs/**' --out datasets/patches/bun-server-bench.jsonl
    ```
 
 3. Inspect the summary printed to stdout (`discovered`, `exported`, skip reasons).
 
 Generated JSONL files under `datasets/` and `release-assets/` are gitignored.
 Export locally, stage with `bun run release:stage`, and upload staging before
-tagging a release. See `docs/RELEASING.md`.
+tagging a release. See `../contributing/releasing.md`.
 
 ## Skip Reasons
 
@@ -174,5 +176,5 @@ runners/export/
   types.ts
 ```
 
-Model training is out of scope for Phase 6. These exports are the compression
-dataset input for a later fine-tuning stage.
+Model training is out of scope for the exporters. These exports are the
+dataset input for a downstream fine-tuning stage.

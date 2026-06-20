@@ -1,6 +1,8 @@
 # Validation
 
-`bun-bench` Phase 1 validation checks whether task packages are structurally valid and ready for runner work.
+`bun run validate` checks whether task packages are structurally valid and ready
+for runner work. It is the first gate every task must pass — before a task is run,
+exported to Harbor, or accepted in a PR.
 
 ## Commands
 
@@ -55,7 +57,7 @@ The validator currently checks:
 
 ## What Is Not Checked Yet
 
-Phase 1 does not yet:
+Validation is structural only. It does not yet:
 
 - run public or hidden tests against an agent submission
 - run the reference solution automatically
@@ -67,13 +69,13 @@ Phase 1 does not yet:
 - verify that declared benchmarking metrics are actually collected
 - emit rollout artifacts
 
-Those belong to later phases.
+Those are runner, Harbor, and dataset-pipeline concerns, not structural validation.
 
 ## Lockfile Compatibility
 
 The task contract's package layout names `bun.lockb`. Current Bun releases write `bun.lock` for text lockfiles and may delete empty lockfiles for no-dependency packages.
 
-For Phase 1, the validator accepts either:
+The validator accepts either:
 
 - `bun.lock`
 - `bun.lockb`

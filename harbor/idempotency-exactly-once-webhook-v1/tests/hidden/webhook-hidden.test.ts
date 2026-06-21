@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 import { getResource, postWebhook, signWebhook } from "../helpers/webhook";
-import { startTaskServer, type RunningServer } from "../helpers/server";
 
 let counter = 0;
 function unique(prefix: string) {
@@ -20,7 +20,9 @@ describe("exactly-once webhook hidden", () => {
   });
 
   test("sequence gap is acked but state does not advance past the gap", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const resource = unique("gap");
     await postWebhook(server.baseUrl, {
       event_id: unique("evt"),
@@ -55,7 +57,9 @@ describe("exactly-once webhook hidden", () => {
   });
 
   test("superseded lower sequence after newer applied is ignored", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const resource = unique("super");
     await postWebhook(server.baseUrl, {
       event_id: unique("evt"),
@@ -84,7 +88,9 @@ describe("exactly-once webhook hidden", () => {
   });
 
   test("concurrent duplicates apply exactly once", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const resource = unique("conc");
     const event = {
       event_id: unique("evt-conc"),
@@ -94,7 +100,7 @@ describe("exactly-once webhook hidden", () => {
       data: { amount: 7 },
     };
     const results = await Promise.all(
-      Array.from({ length: 20 }, () => postWebhook(server.baseUrl, event)),
+      Array.from({ length: 20 }, () => postWebhook(server.baseUrl, event))
     );
     for (const r of results) {
       expect(r.status).toBe(200);
@@ -104,7 +110,9 @@ describe("exactly-once webhook hidden", () => {
   });
 
   test("tampered body fails signature and does not change state", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const resource = unique("tamper");
     const legit = {
       event_id: unique("evt"),
@@ -128,7 +136,9 @@ describe("exactly-once webhook hidden", () => {
   });
 
   test("duplicate after processing returns 200 without extra apply", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const resource = unique("dup2");
     const event = {
       event_id: unique("evt"),
@@ -146,7 +156,9 @@ describe("exactly-once webhook hidden", () => {
   });
 
   test("healthz returns ok", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/healthz`);
     expect(response.status).toBe(200);
     expect((await response.json()).ok).toBe(true);

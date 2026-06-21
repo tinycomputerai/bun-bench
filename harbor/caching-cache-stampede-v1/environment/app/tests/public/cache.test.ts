@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
-async function compute(baseUrl: string, key: string) {
+function compute(baseUrl: string, key: string) {
   return fetch(`${baseUrl}/compute/${encodeURIComponent(key)}`);
 }
 
@@ -21,7 +21,9 @@ describe("cache stampede public", () => {
   });
 
   test("first miss computes, second hit is cached", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const key = "pub-alpha";
     const first = await compute(server.baseUrl, key);
     expect(first.status).toBe(200);
@@ -40,14 +42,18 @@ describe("cache stampede public", () => {
   });
 
   test("distinct keys are isolated", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const a = await (await compute(server.baseUrl, "pub-key-a")).json();
     const b = await (await compute(server.baseUrl, "pub-key-b")).json();
     expect(a.value).not.toBe(b.value);
   });
 
   test("fail- keys return compute_failed", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await compute(server.baseUrl, "fail-pub");
     expect(response.status).toBe(503);
     expect((await response.json()).error).toBe("compute_failed");

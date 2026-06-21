@@ -1,8 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 const TERMINAL = new Set(["succeeded", "dead_letter"]);
-const VALID_STATUS = new Set(["queued", "running", "retrying", "succeeded", "dead_letter"]);
+const VALID_STATUS = new Set([
+  "queued",
+  "running",
+  "retrying",
+  "succeeded",
+  "dead_letter",
+]);
 
 async function createJob(baseUrl: string, type: string) {
   const response = await fetch(`${baseUrl}/jobs`, {
@@ -17,11 +23,17 @@ async function getJob(baseUrl: string, id: string) {
   return (await fetch(`${baseUrl}/jobs/${id}`)).json();
 }
 
-async function pollUntilTerminal(baseUrl: string, id: string, timeoutMs = 5000) {
+async function pollUntilTerminal(
+  baseUrl: string,
+  id: string,
+  timeoutMs = 5000
+) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const job = await getJob(baseUrl, id);
-    if (TERMINAL.has(job.status)) return job;
+    if (TERMINAL.has(job.status)) {
+      return job;
+    }
     await new Promise((r) => setTimeout(r, 20));
   }
   throw new Error("job did not reach a terminal state in time");
@@ -39,7 +51,9 @@ describe("retry-queue edge cases", () => {
   });
 
   test("processing is asynchronous: POST response is queued, not already terminal", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { response, body } = await createJob(server.baseUrl, "ok");
     expect(response.status).toBe(201);
     // The POST itself must report queued. If it processed synchronously it
@@ -49,7 +63,9 @@ describe("retry-queue edge cases", () => {
   });
 
   test("an ok job succeeds with attempts == 1", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { body } = await createJob(server.baseUrl, "ok");
     const job = await pollUntilTerminal(server.baseUrl, body.id);
     expect(job.status).toBe("succeeded");
@@ -57,7 +73,9 @@ describe("retry-queue edge cases", () => {
   });
 
   test("a fail job dead-letters with attempts == 3 and a last_error", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { body } = await createJob(server.baseUrl, "fail");
     const job = await pollUntilTerminal(server.baseUrl, body.id);
     expect(job.status).toBe("dead_letter");
@@ -67,7 +85,9 @@ describe("retry-queue edge cases", () => {
   });
 
   test("a flaky job succeeds on attempt 3 (proves real retry, not give-up)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { body } = await createJob(server.baseUrl, "flaky");
     const job = await pollUntilTerminal(server.baseUrl, body.id);
     expect(job.status).toBe("succeeded");
@@ -75,7 +95,9 @@ describe("retry-queue edge cases", () => {
   });
 
   test("dead_letter is terminal and sticks; attempts never exceed max_attempts", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { body } = await createJob(server.baseUrl, "fail");
     const job = await pollUntilTerminal(server.baseUrl, body.id);
     expect(job.status).toBe("dead_letter");
@@ -92,7 +114,9 @@ describe("retry-queue edge cases", () => {
   });
 
   test("status is always a valid state-machine value while processing", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { body } = await createJob(server.baseUrl, "flaky");
     const deadline = Date.now() + 5000;
     let sawTerminal = false;
@@ -109,7 +133,9 @@ describe("retry-queue edge cases", () => {
   });
 
   test("unknown type is treated as failing and dead-letters", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { body } = await createJob(server.baseUrl, "totally-unknown-type");
     const job = await pollUntilTerminal(server.baseUrl, body.id);
     expect(job.status).toBe("dead_letter");
@@ -117,7 +143,9 @@ describe("retry-queue edge cases", () => {
   });
 
   test("invalid JSON is a 400 and missing type is a 422", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const bad = await fetch(`${server.baseUrl}/jobs`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -134,13 +162,17 @@ describe("retry-queue edge cases", () => {
   });
 
   test("GET /jobs/nonexistent returns 404", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/jobs/nonexistent`);
     expect(response.status).toBe(404);
   });
 
   test("a succeeded ok job exposes the expected shape", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { body } = await createJob(server.baseUrl, "ok");
     const job = await pollUntilTerminal(server.baseUrl, body.id);
     expect(job.id).toBe(body.id);

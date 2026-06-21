@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let server: RunningServer | undefined;
 
@@ -17,7 +17,9 @@ describe("write skew hidden", () => {
   });
 
   test("concurrent off requests leave one on call", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     await resetRoster(server.baseUrl);
     const [r1, r2] = await Promise.all([
       fetch(`${server.baseUrl}/oncall/eng-1/off`, { method: "POST" }),
@@ -30,10 +32,14 @@ describe("write skew hidden", () => {
   });
 
   test("cannot go off when last on call", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     await resetRoster(server.baseUrl);
     await fetch(`${server.baseUrl}/oncall/eng-1/off`, { method: "POST" });
-    const res = await fetch(`${server.baseUrl}/oncall/eng-2/off`, { method: "POST" });
+    const res = await fetch(`${server.baseUrl}/oncall/eng-2/off`, {
+      method: "POST",
+    });
     expect(res.status).toBe(409);
   });
 });

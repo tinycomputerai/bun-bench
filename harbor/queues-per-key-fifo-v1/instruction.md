@@ -45,7 +45,7 @@ concurrently**. The same key must never be processed by two workers at once.
   - `"slow:<ms>"` — waits `<ms>` milliseconds before succeeding.
   - `"fail-once:<marker>"` — fails the first processing attempt, succeeds on retry.
   - `"crash"` — simulates crash mid-process: first attempt re-queues at front; the
-  redelivered attempt succeeds once (idempotent processed log).
+    redelivered attempt succeeds once (idempotent processed log).
 
 ## Notes
 

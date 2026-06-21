@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("GET /request-id", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("GET /request-id", () => {
   });
 
   test("echoes the request id in the body and response header", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/request-id`, {
       headers: { "x-request-id": "req-public-1" },

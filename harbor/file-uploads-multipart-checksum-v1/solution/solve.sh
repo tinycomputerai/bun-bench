@@ -9,17 +9,18 @@ import { createHash, randomUUID } from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-const MAX_SIZE = 1048576; // 1 MiB
+const MAX_SIZE = 1_048_576; // 1 MiB
 const ALLOWED_TYPES = new Set(["image/png", "image/jpeg", "text/plain"]);
+const PATH_SEPARATOR_RE = /[/\\]+/;
 
-type Upload = {
-  id: string;
-  filename: string;
-  size: number;
-  sha256: string;
-  content_type: string;
+interface Upload {
   bytes: Uint8Array;
-};
+  content_type: string;
+  filename: string;
+  id: string;
+  sha256: string;
+  size: number;
+}
 
 const uploads = new Map<string, Upload>();
 
@@ -27,8 +28,10 @@ function sanitizeFilename(name: string): string {
   // Split on both forward and back slashes, drop traversal segments,
   // and keep only the final basename so the result can never contain
   // a separator or "..".
-  const parts = name.split(/[/\\]+/).filter((p) => p !== "" && p !== "." && p !== "..");
-  const base = parts.length > 0 ? parts[parts.length - 1] : "";
+  const parts = name
+    .split(PATH_SEPARATOR_RE)
+    .filter((p) => p !== "" && p !== "." && p !== "..");
+  const base = parts.length > 0 ? parts.at(-1) : "";
   return base === "" ? "file" : base;
 }
 
@@ -57,7 +60,11 @@ Bun.serve({
       }
 
       const value = form.get("file");
-      if (!value || typeof value === "string" || typeof (value as Blob).arrayBuffer !== "function") {
+      if (
+        !value ||
+        typeof value === "string" ||
+        typeof (value as Blob).arrayBuffer !== "function"
+      ) {
         return Response.json({ error: "missing_file" }, { status: 400 });
       }
 
@@ -81,19 +88,35 @@ Bun.serve({
         return Response.json({ error: "checksum_mismatch" }, { status: 422 });
       }
 
-      const filename = sanitizeFilename(typeof file.name === "string" ? file.name : "");
+      const filename = sanitizeFilename(
+        typeof file.name === "string" ? file.name : ""
+      );
       const id = randomUUID();
-      uploads.set(id, { id, filename, size, sha256: digest, content_type: contentType, bytes });
+      uploads.set(id, {
+        id,
+        filename,
+        size,
+        sha256: digest,
+        content_type: contentType,
+        bytes,
+      });
 
       return Response.json(
         { id, filename, size, sha256: digest, content_type: contentType },
-        { status: 201 },
+        { status: 201 }
       );
     }
 
-    if (request.method === "GET" && segments.length === 3 && segments[0] === "uploads" && segments[2] === "checksum") {
+    if (
+      request.method === "GET" &&
+      segments.length === 3 &&
+      segments[0] === "uploads" &&
+      segments[2] === "checksum"
+    ) {
       const upload = uploads.get(segments[1]);
-      if (!upload) return Response.json({ error: "not_found" }, { status: 404 });
+      if (!upload) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
       return Response.json({ sha256: upload.sha256 }, { status: 200 });
     }
 

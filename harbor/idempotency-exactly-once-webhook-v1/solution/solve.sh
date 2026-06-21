@@ -10,29 +10,29 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 const port = Number(Bun.env.PORT ?? 3000);
 const WEBHOOK_SECRET = "webhook-secret";
 
-type ResourceState = {
-  resource_id: string;
+interface ResourceState {
   balance: number;
   last_sequence: number;
-};
+  resource_id: string;
+}
 
-type StoredEvent = {
+interface StoredEvent {
   event_id: string;
   response: { status: number; body: object };
-};
+}
 
 const resources = new Map<string, ResourceState>();
 const processedEvents = new Map<string, StoredEvent>();
 const pendingByResource = new Map<string, Map<number, WebhookPayload>>();
 const resourceLocks = new Map<string, Promise<void>>();
 
-type WebhookPayload = {
+interface WebhookPayload {
+  data: { amount?: number; balance?: number };
   event_id: string;
-  type: "increment" | "set";
   resource_id: string;
   sequence: number;
-  data: { amount?: number; balance?: number };
-};
+  type: "increment" | "set";
+}
 
 function defaultResource(id: string): ResourceState {
   return { resource_id: id, balance: 0, last_sequence: 0 };
@@ -53,17 +53,25 @@ function signBody(raw: string): string {
 }
 
 function verifySignature(raw: string, header: string | null): boolean {
-  if (!header) return false;
+  if (!header) {
+    return false;
+  }
   const expected = signBody(raw);
   const a = Buffer.from(header, "utf8");
   const b = Buffer.from(expected, "utf8");
-  if (a.length !== b.length) return false;
+  if (a.length !== b.length) {
+    return false;
+  }
   return timingSafeEqual(a, b);
 }
 
 function ackBody(resourceId: string): object {
   const state = getResource(resourceId);
-  return { ok: true, resource_id: resourceId, last_sequence: state.last_sequence };
+  return {
+    ok: true,
+    resource_id: resourceId,
+    last_sequence: state.last_sequence,
+  };
 }
 
 function applyEvent(state: ResourceState, event: WebhookPayload): void {
@@ -77,13 +85,17 @@ function applyEvent(state: ResourceState, event: WebhookPayload): void {
 
 function drainPending(state: ResourceState, resourceId: string): void {
   const pending = pendingByResource.get(resourceId);
-  if (!pending || pending.size === 0) return;
+  if (!pending || pending.size === 0) {
+    return;
+  }
   let progressed = true;
   while (progressed) {
     progressed = false;
     const nextSeq = state.last_sequence + 1;
     const next = pending.get(nextSeq);
-    if (!next) break;
+    if (!next) {
+      break;
+    }
     applyEvent(state, next);
     pending.delete(nextSeq);
     progressed = true;
@@ -93,13 +105,19 @@ function drainPending(state: ResourceState, resourceId: string): void {
   }
 }
 
-async function withResourceLock<T>(resourceId: string, fn: () => T | Promise<T>): Promise<T> {
+async function withResourceLock<T>(
+  resourceId: string,
+  fn: () => T | Promise<T>
+): Promise<T> {
   const prev = resourceLocks.get(resourceId) ?? Promise.resolve();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  resourceLocks.set(resourceId, prev.then(() => gate));
+  resourceLocks.set(
+    resourceId,
+    prev.then(() => gate)
+  );
   await prev;
   try {
     return await fn();
@@ -109,17 +127,35 @@ async function withResourceLock<T>(resourceId: string, fn: () => T | Promise<T>)
 }
 
 function validatePayload(body: unknown): WebhookPayload | null {
-  if (typeof body !== "object" || body === null) return null;
+  if (typeof body !== "object" || body === null) {
+    return null;
+  }
   const record = body as Record<string, unknown>;
-  if (typeof record.event_id !== "string" || record.event_id.length === 0) return null;
-  if (record.type !== "increment" && record.type !== "set") return null;
-  if (typeof record.resource_id !== "string" || record.resource_id.length === 0) return null;
-  if (!Number.isInteger(record.sequence) || (record.sequence as number) <= 0) return null;
-  if (typeof record.data !== "object" || record.data === null) return null;
+  if (typeof record.event_id !== "string" || record.event_id.length === 0) {
+    return null;
+  }
+  if (record.type !== "increment" && record.type !== "set") {
+    return null;
+  }
+  if (
+    typeof record.resource_id !== "string" ||
+    record.resource_id.length === 0
+  ) {
+    return null;
+  }
+  if (!Number.isInteger(record.sequence) || (record.sequence as number) <= 0) {
+    return null;
+  }
+  if (typeof record.data !== "object" || record.data === null) {
+    return null;
+  }
   return record as unknown as WebhookPayload;
 }
 
-async function handleWebhook(raw: string, body: unknown): Promise<Response> {
+function handleWebhook(
+  _raw: string,
+  body: unknown
+): Response | Promise<Response> {
   const payload = validatePayload(body);
   if (!payload) {
     return Response.json({ error: "invalid_body" }, { status: 422 });
@@ -127,20 +163,27 @@ async function handleWebhook(raw: string, body: unknown): Promise<Response> {
 
   const existing = processedEvents.get(payload.event_id);
   if (existing) {
-    return Response.json(existing.response.body, { status: existing.response.status });
+    return Response.json(existing.response.body, {
+      status: existing.response.status,
+    });
   }
 
   return withResourceLock(payload.resource_id, () => {
     const again = processedEvents.get(payload.event_id);
     if (again) {
-      return Response.json(again.response.body, { status: again.response.status });
+      return Response.json(again.response.body, {
+        status: again.response.status,
+      });
     }
 
     const state = getResource(payload.resource_id);
 
     if (payload.sequence <= state.last_sequence) {
       const response = { status: 200, body: ackBody(payload.resource_id) };
-      processedEvents.set(payload.event_id, { event_id: payload.event_id, response });
+      processedEvents.set(payload.event_id, {
+        event_id: payload.event_id,
+        response,
+      });
       return Response.json(response.body, { status: response.status });
     }
 
@@ -152,7 +195,10 @@ async function handleWebhook(raw: string, body: unknown): Promise<Response> {
       }
       pending.set(payload.sequence, payload);
       const response = { status: 200, body: ackBody(payload.resource_id) };
-      processedEvents.set(payload.event_id, { event_id: payload.event_id, response });
+      processedEvents.set(payload.event_id, {
+        event_id: payload.event_id,
+        response,
+      });
       return Response.json(response.body, { status: response.status });
     }
 
@@ -160,7 +206,10 @@ async function handleWebhook(raw: string, body: unknown): Promise<Response> {
     drainPending(state, payload.resource_id);
 
     const response = { status: 200, body: ackBody(payload.resource_id) };
-    processedEvents.set(payload.event_id, { event_id: payload.event_id, response });
+    processedEvents.set(payload.event_id, {
+      event_id: payload.event_id,
+      response,
+    });
     return Response.json(response.body, { status: response.status });
   });
 }
@@ -189,7 +238,7 @@ Bun.serve({
           balance: state.balance,
           last_sequence: state.last_sequence,
         },
-        { status: 200 },
+        { status: 200 }
       );
     }
 

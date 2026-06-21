@@ -1,11 +1,15 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function hit(baseUrl: string, clientId: string, extraHeaders: Record<string, string> = {}) {
+function hit(
+  baseUrl: string,
+  clientId: string,
+  extraHeaders: Record<string, string> = {}
+) {
   return fetch(`${baseUrl}/resource`, {
     headers: { "x-client-id": clientId, ...extraHeaders },
   });
@@ -23,27 +27,38 @@ describe("distributed fairness hidden", () => {
   });
 
   test("concurrent burst admits at most ten", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hid-parallel";
-    const results = await Promise.all(Array.from({ length: 30 }, () => hit(server.baseUrl, client)));
+    const results = await Promise.all(
+      Array.from({ length: 30 }, () => hit(server.baseUrl, client))
+    );
     const allowed = results.filter((r) => r.status === 200).length;
     expect(allowed).toBe(10);
   });
 
   test("two concurrent requests for the last slot do not both pass", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hid-last-slot";
     for (let i = 0; i < 9; i += 1) {
       const r = await hit(server.baseUrl, client);
       expect(r.status).toBe(200);
     }
-    const pair = await Promise.all([hit(server.baseUrl, client), hit(server.baseUrl, client)]);
+    const pair = await Promise.all([
+      hit(server.baseUrl, client),
+      hit(server.baseUrl, client),
+    ]);
     const allowed = pair.filter((r) => r.status === 200).length;
     expect(allowed).toBe(1);
   });
 
   test("window rollover refills without double-counting", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hid-rollover";
     for (let i = 0; i < 10; i += 1) {
       expect((await hit(server.baseUrl, client)).status).toBe(200);
@@ -52,16 +67,22 @@ describe("distributed fairness hidden", () => {
     await sleep(1100);
     let allowed = 0;
     for (let i = 0; i < 10; i += 1) {
-      if ((await hit(server.baseUrl, client)).status === 200) allowed += 1;
+      if ((await hit(server.baseUrl, client)).status === 200) {
+        allowed += 1;
+      }
     }
     expect(allowed).toBe(10);
   });
 
   test("client clock skew header does not grant extra budget", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hid-skew";
     for (let i = 0; i < 10; i += 1) {
-      await hit(server.baseUrl, client, { "x-client-time": String(Date.now() + 86_400_000) });
+      await hit(server.baseUrl, client, {
+        "x-client-time": String(Date.now() + 86_400_000),
+      });
     }
     const blocked = await hit(server.baseUrl, client, {
       "x-client-time": String(Date.now() + 86_400_000),
@@ -70,7 +91,9 @@ describe("distributed fairness hidden", () => {
   });
 
   test("remaining decrements across allowed requests", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hid-remaining";
     const seen: number[] = [];
     for (let i = 0; i < 10; i += 1) {
@@ -82,7 +105,9 @@ describe("distributed fairness hidden", () => {
   });
 
   test("429 includes retry-after", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hid-retry";
     for (let i = 0; i < 10; i += 1) {
       await hit(server.baseUrl, client);

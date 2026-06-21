@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
-async function setMode(baseUrl: string, mode: string) {
+function setMode(baseUrl: string, mode: string) {
   return fetch(`${baseUrl}/dependency`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -38,7 +38,9 @@ describe("circuit breaker — state machine", () => {
   });
 
   test("each failed /call counts as one consecutive failure (per-request, not per-attempt)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await setMode(server.baseUrl, "down");
     // One failed GET /call = 3 invocations but exactly 1 consecutive failure.
     await fetch(`${server.baseUrl}/call`);
@@ -49,7 +51,9 @@ describe("circuit breaker — state machine", () => {
   });
 
   test("a success resets the consecutive-failure count", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await setMode(server.baseUrl, "down");
     await failPostCalls(server.baseUrl, 3);
     expect((await breaker(server.baseUrl)).consecutive_failures).toBe(3);
@@ -60,7 +64,9 @@ describe("circuit breaker — state machine", () => {
   });
 
   test("5 consecutive failed calls drive the breaker to open", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await setMode(server.baseUrl, "down");
     await failPostCalls(server.baseUrl, 5);
     const b = await breaker(server.baseUrl);
@@ -69,7 +75,9 @@ describe("circuit breaker — state machine", () => {
   });
 
   test("while OPEN a /call returns 503 fast and does NOT invoke the dependency", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await setMode(server.baseUrl, "down");
     await failPostCalls(server.baseUrl, 5);
     const opened = await breaker(server.baseUrl);
@@ -89,7 +97,9 @@ describe("circuit breaker — state machine", () => {
   });
 
   test("after cooldown with mode up, a /call succeeds and the breaker closes with failures reset", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await setMode(server.baseUrl, "down");
     await failPostCalls(server.baseUrl, 5);
     expect((await breaker(server.baseUrl)).state).toBe("open");
@@ -106,7 +116,9 @@ describe("circuit breaker — state machine", () => {
   });
 
   test("a failed half-open trial reopens the breaker (no permanent close)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await setMode(server.baseUrl, "down");
     await failPostCalls(server.baseUrl, 5);
     expect((await breaker(server.baseUrl)).state).toBe("open");
@@ -123,7 +135,9 @@ describe("circuit breaker — state machine", () => {
   });
 
   test("invalid mode is rejected with 400 and leaves the current mode intact", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const bad = await setMode(server.baseUrl, "sideways");
     expect(bad.status).toBe(400);
     expect((await bad.json()).error).toBe("invalid_mode");
@@ -133,7 +147,9 @@ describe("circuit breaker — state machine", () => {
   });
 
   test("flaky mode fails calls until the mode is changed back to up", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await setMode(server.baseUrl, "flaky");
     const failed = await fetch(`${server.baseUrl}/call`, { method: "POST" });
     expect(failed.status).toBe(502);
@@ -143,7 +159,9 @@ describe("circuit breaker — state machine", () => {
   });
 
   test("GET /call returns the succeeding attempt number when the dependency recovers", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // mode up from start: a GET should succeed on the first attempt.
     const resp = await fetch(`${server.baseUrl}/call`);
     expect(resp.status).toBe(200);

@@ -10,9 +10,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 const port = Number(Bun.env.PORT ?? 3000);
 const secret = Bun.env.JWT_SECRET ?? "bun-server-bench-secret";
 
+const BASE64URL_RE = /^[A-Za-z0-9_-]+$/;
+const BEARER_RE = /^Bearer (.+)$/;
+
 function base64urlDecodeToString(segment: string): string | null {
   // base64url alphabet must not contain +, /, or = padding.
-  if (!/^[A-Za-z0-9_-]+$/.test(segment)) return null;
+  if (!BASE64URL_RE.test(segment)) {
+    return null;
+  }
   try {
     return Buffer.from(segment, "base64url").toString("utf8");
   } catch {
@@ -27,7 +32,9 @@ function sign(signingInput: string): string {
 function constantTimeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "utf8");
   const bufB = Buffer.from(b, "utf8");
-  if (bufA.length !== bufB.length) return false;
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
   return timingSafeEqual(bufA, bufB);
 }
 
@@ -37,7 +44,9 @@ type VerifyResult =
 
 function verify(token: string): VerifyResult {
   const segments = token.split(".");
-  if (segments.length !== 3) return { ok: false, error: "malformed" };
+  if (segments.length !== 3) {
+    return { ok: false, error: "malformed" };
+  }
   const [headerSeg, payloadSeg, signatureSeg] = segments;
   if (headerSeg.length === 0 || payloadSeg.length === 0) {
     return { ok: false, error: "malformed" };
@@ -99,9 +108,13 @@ function verify(token: string): VerifyResult {
 }
 
 function extractBearer(header: string | null): string | null {
-  if (!header) return null;
-  const match = /^Bearer (.+)$/.exec(header.trim());
-  if (!match) return null;
+  if (!header) {
+    return null;
+  }
+  const match = BEARER_RE.exec(header.trim());
+  if (!match) {
+    return null;
+  }
   const token = match[1].trim();
   return token.length > 0 ? token : null;
 }

@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
-function sleep(ms: number) {
+function _sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
 let server: RunningServer | undefined;
 
-async function process(base: string, id: string, payload: string) {
+function process(base: string, id: string, payload: string) {
   return fetch(`${base}/process`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -24,12 +24,16 @@ describe("retry public", () => {
   });
 
   test("healthz", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     expect((await fetch(`${server.baseUrl}/healthz`)).status).toBe(200);
   });
 
   test("ok payload completes", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     const id = `pub-${Math.random().toString(36).slice(2)}`;
     const res = await process(server.baseUrl, id, "ok");
     expect(res.status).toBe(200);

@@ -9,9 +9,15 @@ import { createHash, randomUUID } from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Entry = { id: string; key: string; value: string };
+interface Entry {
+  id: string;
+  key: string;
+  value: string;
+}
 
 const store = new Map<string, Entry>();
+
+const QUOTED_TAG_RE = /^"(.*)"$/;
 
 /** Strong content ETag: quoted lowercase hex sha256 of a canonical {key,value}. */
 function contentEtag(key: string, value: string): string {
@@ -23,15 +29,17 @@ function contentEtag(key: string, value: string): string {
 /** Normalize an ETag / If-Match token: drop optional W/ prefix and surrounding quotes. */
 function normalizeTag(raw: string): string {
   let token = raw.trim();
-  if (token.startsWith("W/")) token = token.slice(2).trim();
-  token = token.replace(/^"(.*)"$/, "$1");
+  if (token.startsWith("W/")) {
+    token = token.slice(2).trim();
+  }
+  token = token.replace(QUOTED_TAG_RE, "$1");
   return token;
 }
 
 function withEtag(entry: Entry, status: number): Response {
   return Response.json(
     { id: entry.id, key: entry.key, value: entry.value },
-    { status, headers: { ETag: contentEtag(entry.key, entry.value) } },
+    { status, headers: { ETag: contentEtag(entry.key, entry.value) } }
   );
 }
 
@@ -49,10 +57,18 @@ Bun.serve({
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.key !== "string" || typeof record.value !== "string") {
+      if (
+        !record ||
+        typeof record.key !== "string" ||
+        typeof record.value !== "string"
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
-      const entry: Entry = { id: randomUUID(), key: record.key, value: record.value };
+      const entry: Entry = {
+        id: randomUUID(),
+        key: record.key,
+        value: record.value,
+      };
       store.set(entry.id, entry);
       return withEtag(entry, 201);
     }
@@ -62,14 +78,19 @@ Bun.serve({
 
       if (request.method === "GET") {
         const entry = store.get(id);
-        if (!entry) return Response.json({ error: "not_found" }, { status: 404 });
+        if (!entry) {
+          return Response.json({ error: "not_found" }, { status: 404 });
+        }
         return withEtag(entry, 200);
       }
 
       if (request.method === "PUT") {
         const header = request.headers.get("if-match");
         if (header === null) {
-          return Response.json({ error: "precondition_required" }, { status: 428 });
+          return Response.json(
+            { error: "precondition_required" },
+            { status: 428 }
+          );
         }
 
         let body: unknown;
@@ -81,19 +102,25 @@ Bun.serve({
         const patch = body as Record<string, unknown> | null;
 
         const entry = store.get(id);
-        if (!entry) return Response.json({ error: "not_found" }, { status: 404 });
+        if (!entry) {
+          return Response.json({ error: "not_found" }, { status: 404 });
+        }
 
         const token = header.trim();
         const isWildcard = token === "*";
         if (!isWildcard) {
           const current = normalizeTag(contentEtag(entry.key, entry.value));
           if (normalizeTag(token) !== current) {
-            return Response.json({ error: "precondition_failed" }, { status: 412 });
+            return Response.json(
+              { error: "precondition_failed" },
+              { status: 412 }
+            );
           }
         }
 
         const nextKey = typeof patch?.key === "string" ? patch.key : entry.key;
-        const nextValue = typeof patch?.value === "string" ? patch.value : entry.value;
+        const nextValue =
+          typeof patch?.value === "string" ? patch.value : entry.value;
         entry.key = nextKey;
         entry.value = nextValue;
         store.set(entry.id, entry);

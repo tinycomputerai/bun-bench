@@ -9,14 +9,17 @@ import { randomUUID } from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Order = {
+interface Order {
   id: string;
-  reference: string;
   item: string;
   qty: number;
+  reference: string;
   status: "created";
-};
-type StoredResponse = { fingerprint: string; order: Order };
+}
+interface StoredResponse {
+  fingerprint: string;
+  order: Order;
+}
 
 const orders = new Map<string, Order>();
 // Per-key record of the first completed create.
@@ -29,7 +32,13 @@ function fingerprint(reference: string, item: string, qty: number): string {
 }
 
 function orderBody(o: Order) {
-  return { id: o.id, reference: o.reference, item: o.item, qty: o.qty, status: o.status };
+  return {
+    id: o.id,
+    reference: o.reference,
+    item: o.item,
+    qty: o.qty,
+    status: o.status,
+  };
 }
 
 Bun.serve({
@@ -45,7 +54,10 @@ Bun.serve({
     if (request.method === "POST" && url.pathname === "/orders") {
       const key = request.headers.get("idempotency-key");
       if (key === null || key.trim() === "") {
-        return Response.json({ error: "missing_idempotency_key" }, { status: 400 });
+        return Response.json(
+          { error: "missing_idempotency_key" },
+          { status: 400 }
+        );
       }
 
       let body: unknown;
@@ -75,7 +87,10 @@ Bun.serve({
       const existing = byKey.get(key);
       if (existing) {
         if (existing.fingerprint !== fp) {
-          return Response.json({ error: "idempotency_key_reuse" }, { status: 409 });
+          return Response.json(
+            { error: "idempotency_key_reuse" },
+            { status: 409 }
+          );
         }
         return Response.json(orderBody(existing.order), {
           status: 201,
@@ -101,9 +116,15 @@ Bun.serve({
       return Response.json(orderBody(order), { status: 201 });
     }
 
-    if (segments.length === 2 && segments[0] === "orders" && request.method === "GET") {
+    if (
+      segments.length === 2 &&
+      segments[0] === "orders" &&
+      request.method === "GET"
+    ) {
       const order = orders.get(segments[1]);
-      if (!order) return Response.json({ error: "not_found" }, { status: 404 });
+      if (!order) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
       return Response.json(orderBody(order), { status: 200 });
     }
 

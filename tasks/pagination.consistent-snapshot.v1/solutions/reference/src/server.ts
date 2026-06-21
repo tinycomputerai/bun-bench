@@ -1,22 +1,25 @@
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Item = {
-  id: string;
-  name: string;
-  updated_at: number;
+const DIGITS_RE = /^\d+$/;
+const ITEM_PATH_RE = /^\/items\/([^/]+)$/;
+
+interface Item {
   deleted: boolean;
-};
-
-type SnapRow = {
   id: string;
   name: string;
   updated_at: number;
-};
+}
 
-type Snapshot = {
+interface SnapRow {
+  id: string;
+  name: string;
+  updated_at: number;
+}
+
+interface Snapshot {
   id: string;
   rows: SnapRow[];
-};
+}
 
 const items = new Map<string, Item>();
 const snapshots = new Map<string, Snapshot>();
@@ -38,8 +41,16 @@ function newSnapshotId(): string {
 function liveRows(): SnapRow[] {
   return [...items.values()]
     .filter((item) => !item.deleted)
-    .map((item) => ({ id: item.id, name: item.name, updated_at: item.updated_at }))
-    .sort((a, b) => (a.updated_at === b.updated_at ? a.id.localeCompare(b.id) : a.updated_at - b.updated_at));
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      updated_at: item.updated_at,
+    }))
+    .sort((a, b) =>
+      a.updated_at === b.updated_at
+        ? a.id.localeCompare(b.id)
+        : a.updated_at - b.updated_at
+    );
 }
 
 function createSnapshot(): Snapshot {
@@ -48,23 +59,42 @@ function createSnapshot(): Snapshot {
   return snapshot;
 }
 
-function encodeCursor(snapshotId: string, updated_at: number, id: string): string {
-  return Buffer.from(JSON.stringify({ s: snapshotId, u: updated_at, i: id, v: 1 }), "utf8").toString("base64url");
+function encodeCursor(
+  snapshotId: string,
+  updated_at: number,
+  id: string
+): string {
+  return Buffer.from(
+    JSON.stringify({ s: snapshotId, u: updated_at, i: id, v: 1 }),
+    "utf8"
+  ).toString("base64url");
 }
 
-function decodeCursor(token: string): { snapshotId: string; updated_at: number; id: string; v: number } | null {
+function decodeCursor(
+  token: string
+): { snapshotId: string; updated_at: number; id: string; v: number } | null {
   try {
-    const parsed = JSON.parse(Buffer.from(token, "base64url").toString("utf8")) as {
+    const parsed = JSON.parse(
+      Buffer.from(token, "base64url").toString("utf8")
+    ) as {
       s?: unknown;
       u?: unknown;
       i?: unknown;
       v?: unknown;
     };
-    if (typeof parsed.s !== "string" || typeof parsed.u !== "number" || typeof parsed.i !== "string") {
+    if (
+      typeof parsed.s !== "string" ||
+      typeof parsed.u !== "number" ||
+      typeof parsed.i !== "string"
+    ) {
       return null;
     }
-    if (parsed.v !== 1) return null;
-    if (!Number.isFinite(parsed.u)) return null;
+    if (parsed.v !== 1) {
+      return null;
+    }
+    if (!Number.isFinite(parsed.u)) {
+      return null;
+    }
     return { snapshotId: parsed.s, updated_at: parsed.u, id: parsed.i, v: 1 };
   } catch {
     return null;
@@ -72,25 +102,43 @@ function decodeCursor(token: string): { snapshotId: string; updated_at: number; 
 }
 
 function parseLimit(raw: string | null): number | null {
-  if (raw === null) return 10;
-  if (!/^\d+$/.test(raw.trim())) return null;
+  if (raw === null) {
+    return 10;
+  }
+  if (!DIGITS_RE.test(raw.trim())) {
+    return null;
+  }
   const value = Number(raw);
-  if (!Number.isInteger(value) || value <= 0) return null;
+  if (!Number.isInteger(value) || value <= 0) {
+    return null;
+  }
   return Math.min(value, 100);
 }
 
-function pageSnapshot(snapshot: Snapshot, cursor: { updated_at: number; id: string } | null, limit: number) {
+function pageSnapshot(
+  snapshot: Snapshot,
+  cursor: { updated_at: number; id: string } | null,
+  limit: number
+) {
   const filtered = snapshot.rows.filter((row) => {
-    if (!cursor) return true;
-    if (row.updated_at > cursor.updated_at) return true;
-    if (row.updated_at === cursor.updated_at && row.id > cursor.id) return true;
+    if (!cursor) {
+      return true;
+    }
+    if (row.updated_at > cursor.updated_at) {
+      return true;
+    }
+    if (row.updated_at === cursor.updated_at && row.id > cursor.id) {
+      return true;
+    }
     return false;
   });
   const page = filtered.slice(0, limit);
   let next_cursor: string | null = null;
   if (page.length === limit && filtered.length > limit) {
-    const last = page[page.length - 1]!;
-    next_cursor = encodeCursor(snapshot.id, last.updated_at, last.id);
+    const last = page.at(-1);
+    if (last !== undefined) {
+      next_cursor = encodeCursor(snapshot.id, last.updated_at, last.id);
+    }
   }
   return { items: page, next_cursor };
 }
@@ -112,18 +160,30 @@ Bun.serve({
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.name !== "string" || record.name.length === 0) {
+      if (
+        !record ||
+        typeof record.name !== "string" ||
+        record.name.length === 0
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const id = newId();
-      const item: Item = { id, name: record.name, updated_at: Date.now(), deleted: false };
+      const item: Item = {
+        id,
+        name: record.name,
+        updated_at: Date.now(),
+        deleted: false,
+      };
       items.set(id, item);
-      return Response.json({ id: item.id, name: item.name, updated_at: item.updated_at }, { status: 201 });
+      return Response.json(
+        { id: item.id, name: item.name, updated_at: item.updated_at },
+        { status: 201 }
+      );
     }
 
-    const itemMatch = /^\/items\/([^/]+)$/.exec(url.pathname);
-    if (itemMatch) {
-      const id = decodeURIComponent(itemMatch[1]!);
+    const itemMatch = ITEM_PATH_RE.exec(url.pathname);
+    if (itemMatch?.[1] !== undefined) {
+      const id = decodeURIComponent(itemMatch[1]);
       const item = items.get(id);
       if (!item || item.deleted) {
         return Response.json({ error: "not_found" }, { status: 404 });
@@ -137,12 +197,19 @@ Bun.serve({
           return Response.json({ error: "invalid_body" }, { status: 422 });
         }
         const record = body as Record<string, unknown> | null;
-        if (!record || typeof record.name !== "string" || record.name.length === 0) {
+        if (
+          !record ||
+          typeof record.name !== "string" ||
+          record.name.length === 0
+        ) {
           return Response.json({ error: "invalid_body" }, { status: 422 });
         }
         item.name = record.name;
         item.updated_at = Date.now();
-        return Response.json({ id: item.id, name: item.name, updated_at: item.updated_at }, { status: 200 });
+        return Response.json(
+          { id: item.id, name: item.name, updated_at: item.updated_at },
+          { status: 200 }
+        );
       }
 
       if (request.method === "DELETE") {

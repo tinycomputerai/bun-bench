@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("conditional cache hidden", () => {
   let server: RunningServer | undefined;
@@ -14,8 +14,12 @@ describe("conditional cache hidden", () => {
   });
 
   test("If-Modified-Since match returns 304", async () => {
-    if (!server) throw new Error("server did not start");
-    const first = await fetch(`${server.baseUrl}/resource`, { headers: identityHeaders });
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const first = await fetch(`${server.baseUrl}/resource`, {
+      headers: identityHeaders,
+    });
     const lastModified = first.headers.get("last-modified");
     const second = await fetch(`${server.baseUrl}/resource`, {
       headers: { ...identityHeaders, "if-modified-since": lastModified ?? "" },
@@ -25,8 +29,12 @@ describe("conditional cache hidden", () => {
   });
 
   test("ETag takes precedence over If-Modified-Since", async () => {
-    if (!server) throw new Error("server did not start");
-    const first = await fetch(`${server.baseUrl}/resource`, { headers: identityHeaders });
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const first = await fetch(`${server.baseUrl}/resource`, {
+      headers: identityHeaders,
+    });
     const etag = first.headers.get("etag");
     const staleSince = new Date(Date.now() + 86_400_000).toUTCString();
     const response = await fetch(`${server.baseUrl}/resource`, {
@@ -40,12 +48,19 @@ describe("conditional cache hidden", () => {
   });
 
   test("PUT requires strong If-Match", async () => {
-    if (!server) throw new Error("server did not start");
-    const current = await fetch(`${server.baseUrl}/resource`, { headers: identityHeaders });
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const current = await fetch(`${server.baseUrl}/resource`, {
+      headers: identityHeaders,
+    });
     const etag = current.headers.get("etag");
     const bad = await fetch(`${server.baseUrl}/resource`, {
       method: "PUT",
-      headers: { "if-match": "W/" + (etag ?? ""), "accept-encoding": "identity" },
+      headers: {
+        "if-match": `W/${etag ?? ""}`,
+        "accept-encoding": "identity",
+      },
       body: "next",
     });
     expect(bad.status).toBe(412);
@@ -60,8 +75,12 @@ describe("conditional cache hidden", () => {
   });
 
   test("cached endpoint respects Vary by encoding", async () => {
-    if (!server) throw new Error("server did not start");
-    const identity = await fetch(`${server.baseUrl}/cached/resource`, { headers: identityHeaders });
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const identity = await fetch(`${server.baseUrl}/cached/resource`, {
+      headers: identityHeaders,
+    });
     const gzip = await fetch(`${server.baseUrl}/cached/resource`, {
       headers: { "accept-encoding": "gzip" },
     });
@@ -72,8 +91,12 @@ describe("conditional cache hidden", () => {
   });
 
   test("cached conditional If-None-Match returns 304", async () => {
-    if (!server) throw new Error("server did not start");
-    const first = await fetch(`${server.baseUrl}/cached/resource`, { headers: identityHeaders });
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const first = await fetch(`${server.baseUrl}/cached/resource`, {
+      headers: identityHeaders,
+    });
     const etag = first.headers.get("etag");
     const second = await fetch(`${server.baseUrl}/cached/resource`, {
       headers: { ...identityHeaders, "if-none-match": etag ?? "" },

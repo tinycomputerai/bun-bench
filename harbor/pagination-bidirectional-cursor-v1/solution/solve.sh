@@ -7,7 +7,13 @@ mkdir -p /app/src
 cat > /app/src/server.ts <<'BUN_SERVER_BENCH_SOLUTION_EOF'
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Item = { id: number; label: string };
+const DIGITS_RE = /^\d+$/;
+const SIGNED_DIGITS_RE = /^-?\d+$/;
+
+interface Item {
+  id: number;
+  label: string;
+}
 
 // Kept sorted ascending by id (ids are assigned monotonically, so push keeps it sorted).
 const items: Item[] = [];
@@ -24,17 +30,27 @@ function decodeCursor(token: string): number | null {
   } catch {
     return null;
   }
-  if (!/^\d+$/.test(decoded)) return null;
+  if (!DIGITS_RE.test(decoded)) {
+    return null;
+  }
   const value = Number(decoded);
-  if (!Number.isInteger(value) || value <= 0) return null;
+  if (!Number.isInteger(value) || value <= 0) {
+    return null;
+  }
   return value;
 }
 
 function parseLimit(raw: string | null): number | null {
-  if (raw === null) return 10;
-  if (!/^-?\d+$/.test(raw.trim())) return null;
+  if (raw === null) {
+    return 10;
+  }
+  if (!SIGNED_DIGITS_RE.test(raw.trim())) {
+    return null;
+  }
   const value = Number(raw);
-  if (!Number.isInteger(value) || value <= 0) return null;
+  if (!Number.isInteger(value) || value <= 0) {
+    return null;
+  }
   return Math.min(value, 100);
 }
 
@@ -68,29 +84,38 @@ Bun.serve({
       const afterParam = url.searchParams.get("after");
       const beforeParam = url.searchParams.get("before");
       if (afterParam !== null && beforeParam !== null) {
-        return Response.json({ error: "invalid_cursor_combination" }, { status: 400 });
+        return Response.json(
+          { error: "invalid_cursor_combination" },
+          { status: 400 }
+        );
       }
 
       let after: number | null = null;
       let before: number | null = null;
       if (afterParam !== null) {
         after = decodeCursor(afterParam);
-        if (after === null) return Response.json({ error: "invalid_cursor" }, { status: 400 });
+        if (after === null) {
+          return Response.json({ error: "invalid_cursor" }, { status: 400 });
+        }
       }
       if (beforeParam !== null) {
         before = decodeCursor(beforeParam);
-        if (before === null) return Response.json({ error: "invalid_cursor" }, { status: 400 });
+        if (before === null) {
+          return Response.json({ error: "invalid_cursor" }, { status: 400 });
+        }
       }
 
       let page: Item[];
       if (before !== null) {
         // Highest-id slice strictly below the cursor, returned ascending.
-        const below = items.filter((it) => it.id < before!);
+        const beforeId = before;
+        const below = items.filter((it) => it.id < beforeId);
         page = below.slice(Math.max(0, below.length - limit));
-      } else if (after !== null) {
-        page = items.filter((it) => it.id > after!).slice(0, limit);
-      } else {
+      } else if (after === null) {
         page = items.slice(0, limit);
+      } else {
+        const afterId = after;
+        page = items.filter((it) => it.id > afterId).slice(0, limit);
       }
 
       let start_cursor: string | null = null;
@@ -98,8 +123,8 @@ Bun.serve({
       let has_next = false;
       let has_prev = false;
       if (page.length > 0) {
-        const firstId = page[0]!.id;
-        const lastId = page[page.length - 1]!.id;
+        const firstId = page[0]?.id;
+        const lastId = page.at(-1)?.id;
         start_cursor = encodeCursor(firstId);
         end_cursor = encodeCursor(lastId);
         has_prev = items.some((it) => it.id < firstId);
@@ -107,8 +132,11 @@ Bun.serve({
       }
 
       return Response.json(
-        { items: page, page_info: { has_next, has_prev, start_cursor, end_cursor } },
-        { status: 200 },
+        {
+          items: page,
+          page_info: { has_next, has_prev, start_cursor, end_cursor },
+        },
+        { status: 200 }
       );
     }
 

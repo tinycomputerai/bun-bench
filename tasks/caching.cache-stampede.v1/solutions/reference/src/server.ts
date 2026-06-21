@@ -5,13 +5,15 @@ const NEGATIVE_TTL_MS = 150;
 const MAX_ENTRIES = 20;
 const COMPUTE_DELAY_MS = 10;
 
-type CacheEntry = {
-  key: string;
-  value?: string;
-  error?: boolean;
+interface CacheEntry {
   computedAt: number;
+  error?: boolean;
+  key: string;
   negativeUntil?: number;
-};
+  value?: string;
+}
+
+const COMPUTE_PATH_RE = /^\/compute\/(.+)$/;
 
 const cache = new Map<string, CacheEntry>();
 const invocationCounts = new Map<string, number>();
@@ -24,6 +26,7 @@ function sleep(ms: number): Promise<void> {
 function hashValue(key: string): string {
   let h = 0;
   for (let i = 0; i < key.length; i += 1) {
+    // biome-ignore lint/suspicious/noBitwiseOperators: uint32 coercion of the rolling hash
     h = (h * 31 + key.charCodeAt(i)) >>> 0;
   }
   return `v-${h.toString(16)}`;
@@ -38,7 +41,9 @@ function touchEntry(key: string, entry: CacheEntry): void {
   cache.set(key, entry);
   if (cache.size > MAX_ENTRIES) {
     const oldest = cache.keys().next().value;
-    if (oldest) cache.delete(oldest);
+    if (oldest) {
+      cache.delete(oldest);
+    }
   }
 }
 
@@ -59,14 +64,20 @@ async function runCompute(key: string): Promise<CacheEntry> {
     touchEntry(key, entry);
     return entry;
   }
-  const entry: CacheEntry = { key, value: hashValue(key), computedAt: Date.now() };
+  const entry: CacheEntry = {
+    key,
+    value: hashValue(key),
+    computedAt: Date.now(),
+  };
   touchEntry(key, entry);
   return entry;
 }
 
 function getInflight(key: string): Promise<CacheEntry> {
   const existing = inflight.get(key);
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
   const promise = runCompute(key).finally(() => {
     inflight.delete(key);
   });
@@ -88,7 +99,9 @@ function isStale(entry: CacheEntry, now: number): boolean {
   return now - entry.computedAt >= TTL_MS;
 }
 
-async function getCompute(key: string): Promise<{ status: number; body: object }> {
+async function getCompute(
+  key: string
+): Promise<{ status: number; body: object }> {
   const now = Date.now();
   const cached = cache.get(key);
 
@@ -101,12 +114,12 @@ async function getCompute(key: string): Promise<{ status: number; body: object }
 
   if (cached && isStale(cached, now) && !cached.error) {
     if (!inflight.has(key)) {
-      void getInflight(key);
+      getInflight(key).catch(() => undefined);
     }
     return { status: 200, body: { value: cached.value, cached: true } };
   }
 
-  if (cached && cached.error && isStale(cached, now)) {
+  if (cached?.error && isStale(cached, now)) {
     const entry = await getInflight(key);
     if (entry.error) {
       return { status: 503, body: { error: "compute_failed", cached: false } };
@@ -138,9 +151,10 @@ Bun.serve({
       return Response.json({ invocations }, { status: 200 });
     }
 
-    const computeMatch = /^\/compute\/(.+)$/.exec(url.pathname);
+    const computeMatch = COMPUTE_PATH_RE.exec(url.pathname);
     if (request.method === "GET" && computeMatch) {
-      const key = decodeURIComponent(computeMatch[1]!);
+      const captured = computeMatch[1];
+      const key = captured === undefined ? "" : decodeURIComponent(captured);
       if (!key) {
         return Response.json({ error: "invalid_key" }, { status: 400 });
       }

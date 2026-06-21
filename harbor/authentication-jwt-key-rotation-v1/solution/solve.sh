@@ -9,11 +9,15 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-type KeyRecord = {
+const KID_RE = /^[a-zA-Z0-9_-]+$/;
+const BEARER_RE = /^Bearer (.+)$/;
+const RETIRE_PATH_RE = /^\/keys\/([^/]+)\/retire$/;
+
+interface KeyRecord {
   kid: string;
-  secret: string;
   retired: boolean;
-};
+  secret: string;
+}
 
 const keys = new Map<string, KeyRecord>();
 let activeKid = "";
@@ -26,8 +30,12 @@ function invalidateJwksCache(): void {
 }
 
 function validKid(kid: string): boolean {
-  if (!kid || kid.length > 64) return false;
-  if (!/^[a-zA-Z0-9_-]+$/.test(kid)) return false;
+  if (!kid || kid.length > 64) {
+    return false;
+  }
+  if (!KID_RE.test(kid)) {
+    return false;
+  }
   return true;
 }
 
@@ -51,7 +59,9 @@ function b64url(input: string | Buffer): string {
 function constantTimeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "utf8");
   const bufB = Buffer.from(b, "utf8");
-  if (bufA.length !== bufB.length) return false;
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
   return timingSafeEqual(bufA, bufB);
 }
 
@@ -76,49 +86,84 @@ function buildJwks(): { keys: object[] } {
 
 function verifyToken(token: string): { sub: string } | null {
   const segments = token.split(".");
-  if (segments.length !== 3) return null;
+  if (segments.length !== 3) {
+    return null;
+  }
   const [headerSeg, payloadSeg, sigSeg] = segments;
-  if (!headerSeg || !payloadSeg || !sigSeg) return null;
+  if (!(headerSeg && payloadSeg && sigSeg)) {
+    return null;
+  }
 
   let header: Record<string, unknown>;
   let payload: Record<string, unknown>;
   try {
-    header = JSON.parse(Buffer.from(headerSeg, "base64url").toString("utf8")) as Record<string, unknown>;
-    payload = JSON.parse(Buffer.from(payloadSeg, "base64url").toString("utf8")) as Record<string, unknown>;
+    header = JSON.parse(
+      Buffer.from(headerSeg, "base64url").toString("utf8")
+    ) as Record<string, unknown>;
+    payload = JSON.parse(
+      Buffer.from(payloadSeg, "base64url").toString("utf8")
+    ) as Record<string, unknown>;
   } catch {
     return null;
   }
 
-  if (header.alg !== "HS256") return null;
+  if (header.alg !== "HS256") {
+    return null;
+  }
   const kid = header.kid;
-  if (typeof kid !== "string" || !validKid(kid)) return null;
+  if (typeof kid !== "string" || !validKid(kid)) {
+    return null;
+  }
 
   const key = keys.get(kid);
-  if (!key || key.retired) return null;
+  if (!key || key.retired) {
+    return null;
+  }
 
-  const expected = createHmac("sha256", key.secret).update(`${headerSeg}.${payloadSeg}`).digest("base64url");
-  if (!constantTimeEqual(sigSeg, expected)) return null;
+  const expected = createHmac("sha256", key.secret)
+    .update(`${headerSeg}.${payloadSeg}`)
+    .digest("base64url");
+  if (!constantTimeEqual(sigSeg, expected)) {
+    return null;
+  }
 
-  if (typeof payload.exp === "number" && payload.exp <= Math.floor(Date.now() / 1000)) return null;
-  if (typeof payload.sub !== "string") return null;
+  if (
+    typeof payload.exp === "number" &&
+    payload.exp <= Math.floor(Date.now() / 1000)
+  ) {
+    return null;
+  }
+  if (typeof payload.sub !== "string") {
+    return null;
+  }
   return { sub: payload.sub };
 }
 
 function signToken(sub: string): string {
   const key = keys.get(activeKid);
-  if (!key) throw new Error("no active key");
-  const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT", kid: key.kid }));
+  if (!key) {
+    throw new Error("no active key");
+  }
+  const header = b64url(
+    JSON.stringify({ alg: "HS256", typ: "JWT", kid: key.kid })
+  );
   const now = Math.floor(Date.now() / 1000);
   const payload = b64url(JSON.stringify({ sub, iat: now, exp: now + 3600 }));
   const signingInput = `${header}.${payload}`;
-  const sig = createHmac("sha256", key.secret).update(signingInput).digest("base64url");
+  const sig = createHmac("sha256", key.secret)
+    .update(signingInput)
+    .digest("base64url");
   return `${signingInput}.${sig}`;
 }
 
 function extractBearer(header: string | null): string | null {
-  if (!header) return null;
-  const match = /^Bearer (.+)$/.exec(header.trim());
-  if (!match) return null;
+  if (!header) {
+    return null;
+  }
+  const match = BEARER_RE.exec(header.trim());
+  if (!match) {
+    return null;
+  }
   const token = match[1].trim();
   return token.length > 0 ? token : null;
 }
@@ -145,9 +190,9 @@ Bun.serve({
       return Response.json({ kid, active: true }, { status: 200 });
     }
 
-    const retireMatch = /^\/keys\/([^/]+)\/retire$/.exec(url.pathname);
-    if (request.method === "POST" && retireMatch) {
-      const kid = decodeURIComponent(retireMatch[1]!);
+    const retireMatch = RETIRE_PATH_RE.exec(url.pathname);
+    if (request.method === "POST" && retireMatch?.[1] !== undefined) {
+      const kid = decodeURIComponent(retireMatch[1]);
       if (!validKid(kid)) {
         return Response.json({ error: "invalid_kid" }, { status: 400 });
       }
@@ -168,7 +213,10 @@ Bun.serve({
           if (!record || typeof record.sub !== "string") {
             return Response.json({ error: "invalid_body" }, { status: 422 });
           }
-          return Response.json({ token: signToken(record.sub) }, { status: 200 });
+          return Response.json(
+            { token: signToken(record.sub) },
+            { status: 200 }
+          );
         })
         .catch(() => Response.json({ error: "invalid_body" }, { status: 422 }));
     }

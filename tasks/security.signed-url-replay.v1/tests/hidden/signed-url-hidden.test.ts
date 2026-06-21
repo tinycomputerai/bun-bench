@@ -1,9 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let server: RunningServer | undefined;
 
-async function sign(base: string, method: string, path: string, query?: Record<string, string>) {
+function sign(
+  base: string,
+  method: string,
+  path: string,
+  query?: Record<string, string>
+) {
   return fetch(`${base}/sign`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -20,7 +25,9 @@ describe("signed url hidden", () => {
   });
 
   test("replay nonce rejected", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     const signed = await (await sign(server.baseUrl, "GET", "/secret")).json();
     const url = `${server.baseUrl}${signed.url}`;
     expect((await fetch(url)).status).toBe(200);
@@ -28,21 +35,29 @@ describe("signed url hidden", () => {
   });
 
   test("tampered query rejected", async () => {
-    if (!server) throw new Error("no server");
-    const signed = await (await sign(server.baseUrl, "GET", "/secret", { a: "1" })).json();
+    if (!server) {
+      throw new Error("no server");
+    }
+    const signed = await (
+      await sign(server.baseUrl, "GET", "/secret", { a: "1" })
+    ).json();
     const tampered = signed.url.replace("a=1", "a=2");
     expect((await fetch(`${server.baseUrl}${tampered}`)).status).toBe(403);
   });
 
   test("tampered path rejected", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     const signed = await (await sign(server.baseUrl, "GET", "/secret")).json();
     const tampered = signed.url.replace("/secret", "/other");
     expect((await fetch(`${server.baseUrl}${tampered}`)).status).toBe(403);
   });
 
   test("expired url rejected", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     const signed = await (
       await fetch(`${server.baseUrl}/sign`, {
         method: "POST",

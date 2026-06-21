@@ -29,9 +29,9 @@ Bun.serve({
       const now = Date.now();
       const window = recent(clientId, now);
 
-      if (window.length >= LIMIT) {
+      const oldest = window[0];
+      if (window.length >= LIMIT && oldest !== undefined) {
         // Oldest in-window timestamp leaves the window at oldest + WINDOW_MS.
-        const oldest = window[0]!;
         const msUntilFree = oldest + WINDOW_MS - now;
         const retryAfter = Math.max(1, Math.ceil(msUntilFree / 1000));
         return Response.json(
@@ -43,7 +43,7 @@ Bun.serve({
               "X-RateLimit-Limit": String(LIMIT),
               "X-RateLimit-Remaining": "0",
             },
-          },
+          }
         );
       }
 
@@ -58,7 +58,7 @@ Bun.serve({
             "X-RateLimit-Limit": String(LIMIT),
             "X-RateLimit-Remaining": String(remaining),
           },
-        },
+        }
       );
     }
 

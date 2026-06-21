@@ -3,7 +3,10 @@ const port = Number(Bun.env.PORT ?? 3000);
 const CAPACITY = 5;
 const REFILL_MS_PER_TOKEN = 200; // 1 token per 200ms => 5 tokens/sec.
 
-type Bucket = { tokens: number; updatedAt: number };
+interface Bucket {
+  tokens: number;
+  updatedAt: number;
+}
 
 const buckets = new Map<string, Bucket>();
 
@@ -46,7 +49,7 @@ Bun.serve({
           {
             status: 200,
             headers: { "X-RateLimit-Remaining": String(remaining) },
-          },
+          }
         );
       }
 
@@ -61,7 +64,7 @@ Bun.serve({
             "Retry-After": String(retryAfter),
             "X-RateLimit-Remaining": "0",
           },
-        },
+        }
       );
     }
 

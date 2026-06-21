@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("rate limit edge cases", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("rate limit edge cases", () => {
   });
 
   test("rejects the third request from the same client", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const headers = { "x-client-id": "client-hidden-limit" };
     await fetch(`${server.baseUrl}/limited`, { headers });
@@ -25,7 +27,9 @@ describe("rate limit edge cases", () => {
   });
 
   test("keeps separate counters for different clients", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/limited`, {
       headers: { "x-client-id": "client-hidden-fresh" },

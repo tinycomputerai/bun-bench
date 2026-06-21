@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 async function createUser(baseUrl: string, name: string, email: string) {
   const response = await fetch(`${baseUrl}/users`, {
@@ -27,7 +27,9 @@ describe("idempotent migrations", () => {
   });
 
   test("version is exactly 3 and applied list is correct after boot", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { status, body } = await version(server.baseUrl);
     expect(status).toBe(200);
     expect(body.version).toBe(3);
@@ -40,17 +42,27 @@ describe("idempotent migrations", () => {
   });
 
   test("creating a user with an email succeeds (proves migration 2 ran)", async () => {
-    if (!server) throw new Error("server did not start");
-    const { response, user } = await createUser(server.baseUrl, "bob", "bob@example.com");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const { response, user } = await createUser(
+      server.baseUrl,
+      "bob",
+      "bob@example.com"
+    );
     expect(response.status).toBe(201);
     expect(user.email).toBe("bob@example.com");
 
-    const read = await (await fetch(`${server.baseUrl}/users/${user.id}`)).json();
+    const read = await (
+      await fetch(`${server.baseUrl}/users/${user.id}`)
+    ).json();
     expect(read.email).toBe("bob@example.com");
   });
 
   test("invalid bodies are rejected with 422", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const missingEmail = await fetch(`${server.baseUrl}/users`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -74,9 +86,15 @@ describe("idempotent migrations", () => {
   });
 
   test("after a restart the server still starts, version is still 3, and migrations are not re-applied", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // Create a user before the restart so we can prove data persistence too.
-    const { user } = await createUser(server.baseUrl, "carol", "carol@example.com");
+    const { user } = await createUser(
+      server.baseUrl,
+      "carol",
+      "carol@example.com"
+    );
 
     await server.stop();
     // A naive unconditional `ALTER TABLE users ADD COLUMN email` would throw
@@ -102,8 +120,14 @@ describe("idempotent migrations", () => {
   });
 
   test("a second restart still does not re-apply migrations", async () => {
-    if (!server) throw new Error("server did not start");
-    const { user } = await createUser(server.baseUrl, "dave", "dave@example.com");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const { user } = await createUser(
+      server.baseUrl,
+      "dave",
+      "dave@example.com"
+    );
 
     await server.stop();
     server = await startTaskServer();

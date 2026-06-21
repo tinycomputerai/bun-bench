@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 async function createDoc(baseUrl: string, title = "t", body = "b") {
   const response = await fetch(`${baseUrl}/docs`, {
@@ -22,18 +22,26 @@ describe("optimistic concurrency edge cases", () => {
   });
 
   test("only one of two concurrent updates on the same version succeeds (lost-update prevention)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const doc = await createDoc(server.baseUrl, "race", "v1");
 
     const [a, b] = await Promise.all([
       fetch(`${server.baseUrl}/docs/${doc.id}`, {
         method: "PUT",
-        headers: { "content-type": "application/json", "if-match": String(doc.version) },
+        headers: {
+          "content-type": "application/json",
+          "if-match": String(doc.version),
+        },
         body: JSON.stringify({ body: "writer-a" }),
       }),
       fetch(`${server.baseUrl}/docs/${doc.id}`, {
         method: "PUT",
-        headers: { "content-type": "application/json", "if-match": String(doc.version) },
+        headers: {
+          "content-type": "application/json",
+          "if-match": String(doc.version),
+        },
         body: JSON.stringify({ body: "writer-b" }),
       }),
     ]);
@@ -41,18 +49,25 @@ describe("optimistic concurrency edge cases", () => {
     const statuses = [a.status, b.status].sort();
     expect(statuses).toEqual([200, 409]);
 
-    const final = await (await fetch(`${server.baseUrl}/docs/${doc.id}`)).json();
+    const final = await (
+      await fetch(`${server.baseUrl}/docs/${doc.id}`)
+    ).json();
     expect(final.version).toBe(2);
   });
 
   test("version is monotonic and never reused across many updates", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const doc = await createDoc(server.baseUrl, "mono", "v1");
     let version = doc.version;
     for (let i = 0; i < 5; i += 1) {
       const response = await fetch(`${server.baseUrl}/docs/${doc.id}`, {
         method: "PUT",
-        headers: { "content-type": "application/json", "if-match": String(version) },
+        headers: {
+          "content-type": "application/json",
+          "if-match": String(version),
+        },
         body: JSON.stringify({ body: `v${i}` }),
       });
       expect(response.status).toBe(200);
@@ -63,7 +78,9 @@ describe("optimistic concurrency edge cases", () => {
   });
 
   test("missing If-Match on update is rejected with 428", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const doc = await createDoc(server.baseUrl);
     const response = await fetch(`${server.baseUrl}/docs/${doc.id}`, {
       method: "PUT",
@@ -75,28 +92,39 @@ describe("optimistic concurrency edge cases", () => {
   });
 
   test("non-numeric If-Match is a 400, not a conflict", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const doc = await createDoc(server.baseUrl);
     const response = await fetch(`${server.baseUrl}/docs/${doc.id}`, {
       method: "PUT",
-      headers: { "content-type": "application/json", "if-match": "not-a-version" },
+      headers: {
+        "content-type": "application/json",
+        "if-match": "not-a-version",
+      },
       body: JSON.stringify({ body: "x" }),
     });
     expect(response.status).toBe(400);
   });
 
   test("GET exposes the current version via the ETag header", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const doc = await createDoc(server.baseUrl);
     const response = await fetch(`${server.baseUrl}/docs/${doc.id}`);
     expect(response.headers.get("etag")).toBe(`"${doc.version}"`);
   });
 
   test("DELETE requires a matching If-Match and removes the document", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const doc = await createDoc(server.baseUrl);
 
-    const noGuard = await fetch(`${server.baseUrl}/docs/${doc.id}`, { method: "DELETE" });
+    const noGuard = await fetch(`${server.baseUrl}/docs/${doc.id}`, {
+      method: "DELETE",
+    });
     expect(noGuard.status).toBe(428);
 
     const removed = await fetch(`${server.baseUrl}/docs/${doc.id}`, {
@@ -110,11 +138,16 @@ describe("optimistic concurrency edge cases", () => {
   });
 
   test("documents and versions survive a process restart", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const doc = await createDoc(server.baseUrl, "persist", "original");
     await fetch(`${server.baseUrl}/docs/${doc.id}`, {
       method: "PUT",
-      headers: { "content-type": "application/json", "if-match": String(doc.version) },
+      headers: {
+        "content-type": "application/json",
+        "if-match": String(doc.version),
+      },
       body: JSON.stringify({ body: "updated" }),
     });
 

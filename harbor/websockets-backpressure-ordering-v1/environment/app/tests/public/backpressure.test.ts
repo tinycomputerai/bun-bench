@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let server: RunningServer | undefined;
 const sockets: WebSocket[] = [];
@@ -8,22 +8,30 @@ function wsUrl(base: string, topic: string): string {
   return `${base.replace("http", "ws")}/ws?topic=${encodeURIComponent(topic)}`;
 }
 
-type Recorder = { ws: WebSocket; next: (pred: (m: any) => boolean, ms?: number) => Promise<any> };
+interface Recorder {
+  next: (pred: (m: any) => boolean, ms?: number) => Promise<any>;
+  ws: WebSocket;
+}
 
 function connect(url: string): Promise<Recorder> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
     sockets.push(ws);
     const buffer: any[] = [];
-    let waiter: { predicate: (m: any) => boolean; resolve: (m: any) => void } | null = null;
+    let waiter: {
+      predicate: (m: any) => boolean;
+      resolve: (m: any) => void;
+    } | null = null;
     ws.addEventListener("message", (event: MessageEvent) => {
       let parsed: any;
       try {
-        parsed = JSON.parse(typeof event.data === "string" ? event.data : String(event.data));
+        parsed = JSON.parse(
+          typeof event.data === "string" ? event.data : String(event.data)
+        );
       } catch {
         return;
       }
-      if (waiter && waiter.predicate(parsed)) {
+      if (waiter?.predicate(parsed)) {
         const w = waiter;
         waiter = null;
         w.resolve(parsed);
@@ -38,7 +46,9 @@ function connect(url: string): Promise<Recorder> {
         ws,
         next(predicate, ms = 4000) {
           const idx = buffer.findIndex(predicate);
-          if (idx >= 0) return Promise.resolve(buffer.splice(idx, 1)[0]);
+          if (idx >= 0) {
+            return Promise.resolve(buffer.splice(idx, 1)[0]);
+          }
           return new Promise((res, rej) => {
             const timer = setTimeout(() => {
               waiter = null;
@@ -59,7 +69,7 @@ function connect(url: string): Promise<Recorder> {
   });
 }
 
-async function publish(base: string, topic: string, data: unknown) {
+function publish(base: string, topic: string, data: unknown) {
   return fetch(`${base}/publish`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -72,17 +82,23 @@ describe("backpressure public", () => {
     server = await startTaskServer();
   });
   afterAll(async () => {
-    for (const ws of sockets) ws.close();
+    for (const ws of sockets) {
+      ws.close();
+    }
     await server?.stop();
   });
 
   test("healthz", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     expect((await fetch(`${server.baseUrl}/healthz`)).status).toBe(200);
   });
 
   test("subscriber receives ordered seq", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     const topic = `pub-${Math.random().toString(36).slice(2)}`;
     const sub = await connect(wsUrl(server.baseUrl, topic));
     await publish(server.baseUrl, topic, { n: 1 });

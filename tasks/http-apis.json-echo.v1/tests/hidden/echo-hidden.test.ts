@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("JSON echo edge cases", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("JSON echo edge cases", () => {
   });
 
   test("rejects malformed JSON", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/echo`, {
       method: "POST",
@@ -26,7 +28,9 @@ describe("JSON echo edge cases", () => {
   });
 
   test("returns JSON for unsupported methods", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/echo`);
 

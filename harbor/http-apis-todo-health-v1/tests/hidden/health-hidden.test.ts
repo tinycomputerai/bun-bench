@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("health endpoint edge cases", () => {
   let server: RunningServer | undefined;
@@ -29,7 +29,9 @@ describe("health endpoint edge cases", () => {
       throw new Error("server did not start");
     }
 
-    const response = await fetch(`${server.baseUrl}/health`, { method: "POST" });
+    const response = await fetch(`${server.baseUrl}/health`, {
+      method: "POST",
+    });
 
     expect(response.status).toBe(404);
     expect(response.headers.get("content-type")).toContain("application/json");

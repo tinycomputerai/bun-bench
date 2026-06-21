@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function hit(baseUrl: string, clientId: string) {
+function hit(baseUrl: string, clientId: string) {
   return fetch(`${baseUrl}/resource`, { headers: { "x-client-id": clientId } });
 }
 
@@ -21,12 +21,16 @@ describe("sliding window rate limit edge cases", () => {
   });
 
   test("five requests succeed then the sixth immediately returns 429 with a valid Retry-After", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hidden-burst";
     let allowed = 0;
     for (let i = 0; i < 5; i += 1) {
       const r = await hit(server.baseUrl, client);
-      if (r.status === 200) allowed += 1;
+      if (r.status === 200) {
+        allowed += 1;
+      }
     }
     expect(allowed).toBe(5);
 
@@ -40,12 +44,16 @@ describe("sliding window rate limit edge cases", () => {
   });
 
   test("sliding property: 5 at once, sleep 500ms, the next is STILL 429 (a fixed window would wrongly allow it)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hidden-sliding";
     let allowed = 0;
     for (let i = 0; i < 5; i += 1) {
       const r = await hit(server.baseUrl, client);
-      if (r.status === 200) allowed += 1;
+      if (r.status === 200) {
+        allowed += 1;
+      }
     }
     expect(allowed).toBe(5);
 
@@ -58,7 +66,9 @@ describe("sliding window rate limit edge cases", () => {
   });
 
   test("after the window fully elapses the client is allowed again", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hidden-recover";
     for (let i = 0; i < 5; i += 1) {
       await hit(server.baseUrl, client);
@@ -74,7 +84,9 @@ describe("sliding window rate limit edge cases", () => {
   });
 
   test("two different client ids have independent limits", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // Exhaust client A.
     for (let i = 0; i < 5; i += 1) {
       await hit(server.baseUrl, "hidden-independent-a");
@@ -88,7 +100,9 @@ describe("sliding window rate limit edge cases", () => {
   });
 
   test("X-RateLimit-Remaining decrements correctly across allowed requests", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hidden-remaining";
     const seen: number[] = [];
     for (let i = 0; i < 5; i += 1) {

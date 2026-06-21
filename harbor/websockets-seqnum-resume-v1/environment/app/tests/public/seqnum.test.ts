@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let server: RunningServer | undefined;
 const sockets: WebSocket[] = [];
@@ -9,26 +9,31 @@ function wsUrl(base: string, channel: string, lastSeq?: number): string {
   return `${base.replace("http", "ws")}/ws?channel=${encodeURIComponent(channel)}${q}`;
 }
 
-type Recorder = {
-  ws: WebSocket;
+interface Recorder {
   next: (predicate: (m: any) => boolean, ms?: number) => Promise<any>;
-};
+  ws: WebSocket;
+}
 
 function connect(url: string): Promise<Recorder> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
     sockets.push(ws);
     const buffer: any[] = [];
-    let waiter: { predicate: (m: any) => boolean; resolve: (m: any) => void } | null = null;
+    let waiter: {
+      predicate: (m: any) => boolean;
+      resolve: (m: any) => void;
+    } | null = null;
 
     ws.addEventListener("message", (event: MessageEvent) => {
       let parsed: any;
       try {
-        parsed = JSON.parse(typeof event.data === "string" ? event.data : String(event.data));
+        parsed = JSON.parse(
+          typeof event.data === "string" ? event.data : String(event.data)
+        );
       } catch {
         return;
       }
-      if (waiter && waiter.predicate(parsed)) {
+      if (waiter?.predicate(parsed)) {
         const w = waiter;
         waiter = null;
         w.resolve(parsed);
@@ -37,7 +42,10 @@ function connect(url: string): Promise<Recorder> {
       buffer.push(parsed);
     });
 
-    const openTimer = setTimeout(() => reject(new Error("ws open timeout")), 4000);
+    const openTimer = setTimeout(
+      () => reject(new Error("ws open timeout")),
+      4000
+    );
     ws.addEventListener("open", () => {
       clearTimeout(openTimer);
       resolve({
@@ -73,7 +81,9 @@ function connect(url: string): Promise<Recorder> {
 
 function closed(ws: WebSocket): Promise<void> {
   return new Promise((resolve) => {
-    if (ws.readyState === WebSocket.CLOSED) return resolve();
+    if (ws.readyState === WebSocket.CLOSED) {
+      return resolve();
+    }
     ws.addEventListener("close", () => resolve());
     ws.close();
   });
@@ -101,20 +111,26 @@ describe("seqnum resume (public)", () => {
     for (const ws of sockets) {
       try {
         ws.close();
-      } catch {}
+      } catch {
+        /* ignore close errors during teardown */
+      }
     }
     await server?.stop();
   });
 
   test("healthz responds 200 {ok:true}", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const res = await fetch(`${server.baseUrl}/healthz`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
   });
 
   test("publish assigns seq starting at 1 and returns 201", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const channel = cid("pub");
     const first = await publish(server.baseUrl, channel, { n: 1 });
     expect(first.status).toBe(201);
@@ -124,7 +140,9 @@ describe("seqnum resume (public)", () => {
   });
 
   test("live subscriber receives published messages with increasing seq from 1", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const channel = cid("live");
     const sub = await connect(wsUrl(server.baseUrl, channel, 0));
     await publish(server.baseUrl, channel, { v: "a" });

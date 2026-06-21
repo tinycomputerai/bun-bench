@@ -1,6 +1,13 @@
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Event = { id: number; message: string; created_at: number };
+const DIGITS_RE = /^\d+$/;
+const SIGNED_DIGITS_RE = /^-?\d+$/;
+
+interface Event {
+  created_at: number;
+  id: number;
+  message: string;
+}
 
 const events: Event[] = [];
 let nextId = 1;
@@ -16,17 +23,27 @@ function decodeCursor(token: string): number | null {
   } catch {
     return null;
   }
-  if (!/^\d+$/.test(decoded)) return null;
+  if (!DIGITS_RE.test(decoded)) {
+    return null;
+  }
   const value = Number(decoded);
-  if (!Number.isInteger(value) || value <= 0) return null;
+  if (!Number.isInteger(value) || value <= 0) {
+    return null;
+  }
   return value;
 }
 
 function parseLimit(raw: string | null): number | null {
-  if (raw === null) return 10;
-  if (!/^-?\d+$/.test(raw.trim())) return null;
+  if (raw === null) {
+    return 10;
+  }
+  if (!SIGNED_DIGITS_RE.test(raw.trim())) {
+    return null;
+  }
   const value = Number(raw);
-  if (!Number.isInteger(value) || value <= 0) return null;
+  if (!Number.isInteger(value) || value <= 0) {
+    return null;
+  }
   return Math.min(value, 100);
 }
 
@@ -46,7 +63,11 @@ Bun.serve({
       if (!record || typeof record.message !== "string") {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
-      const event: Event = { id: nextId++, message: record.message, created_at: Date.now() };
+      const event: Event = {
+        id: nextId++,
+        message: record.message,
+        created_at: Date.now(),
+      };
       events.push(event);
       return Response.json(event, { status: 201 });
     }
@@ -58,7 +79,7 @@ Bun.serve({
       }
 
       const cursorParam = url.searchParams.get("cursor");
-      let boundary = Infinity;
+      let boundary = Number.POSITIVE_INFINITY;
       if (cursorParam !== null) {
         const decoded = decodeCursor(cursorParam);
         if (decoded === null) {
@@ -70,8 +91,9 @@ Bun.serve({
       // Newest-first: iterate ids descending, take those with id < boundary.
       const items: Event[] = [];
       for (let i = events.length - 1; i >= 0 && items.length < limit; i -= 1) {
-        if (events[i]!.id < boundary) {
-          items.push(events[i]!);
+        const ev = events[i];
+        if (ev !== undefined && ev.id < boundary) {
+          items.push(ev);
         }
       }
 
@@ -81,7 +103,7 @@ Bun.serve({
       // an empty next page with a null cursor, which is the documented contract.
       let next_cursor: string | null = null;
       if (items.length === limit) {
-        next_cursor = encodeCursor(items[items.length - 1]!.id);
+        next_cursor = encodeCursor(items.at(-1)?.id);
       }
 
       return Response.json({ items, next_cursor }, { status: 200 });

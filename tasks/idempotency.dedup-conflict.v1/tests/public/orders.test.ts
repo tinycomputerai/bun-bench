@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let counter = 0;
 function unique(prefix: string) {
@@ -27,7 +27,9 @@ describe("idempotent order creation", () => {
   });
 
   test("a new key creates an order at status created", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await createOrder(server.baseUrl, unique("key"), {
       reference: unique("ref"),
       item: "widget",
@@ -42,7 +44,9 @@ describe("idempotent order creation", () => {
   });
 
   test("the created order is readable via GET /orders/:id", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await (
       await createOrder(server.baseUrl, unique("key"), {
         reference: unique("ref"),
@@ -59,7 +63,9 @@ describe("idempotent order creation", () => {
   });
 
   test("missing Idempotency-Key is rejected with 400", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/orders`, {
       method: "POST",
       headers: { "content-type": "application/json" },

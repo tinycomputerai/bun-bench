@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHmac } from "node:crypto";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 const SECRET = "bun-server-bench-secret";
 
@@ -11,7 +11,7 @@ function b64url(input: string | Buffer): string {
 // Minimal self-contained JWT signer so tests mint their own tokens.
 function signJwt(
   payload: Record<string, unknown>,
-  opts: { alg?: string; secret?: string } = {},
+  opts: { alg?: string; secret?: string } = {}
 ): string {
   const alg = opts.alg ?? "HS256";
   const secret = opts.secret ?? SECRET;
@@ -19,7 +19,9 @@ function signJwt(
   const body = b64url(JSON.stringify(payload));
   const signingInput = `${header}.${body}`;
   const hmacAlg = alg === "HS512" ? "sha512" : "sha256";
-  const sig = createHmac(hmacAlg, secret).update(signingInput).digest("base64url");
+  const sig = createHmac(hmacAlg, secret)
+    .update(signingInput)
+    .digest("base64url");
   return `${signingInput}.${sig}`;
 }
 
@@ -39,7 +41,9 @@ describe("jwt-verify GET /me", () => {
   });
 
   test("accepts a valid unexpired HS256 token and returns the claims", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const token = signJwt({ sub: "user-1", exp: nowPlus(3600) });
     const response = await fetch(`${server.baseUrl}/me`, {
       headers: { authorization: `Bearer ${token}` },
@@ -50,15 +54,22 @@ describe("jwt-verify GET /me", () => {
   });
 
   test("rejects a request with no Authorization header as missing_token", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/me`);
     expect(response.status).toBe(401);
     expect((await response.json()).error).toBe("missing_token");
   });
 
   test("rejects a tampered signature with invalid_signature", async () => {
-    if (!server) throw new Error("server did not start");
-    const token = signJwt({ sub: "user-1", exp: nowPlus(3600) }, { secret: "wrong-secret" });
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const token = signJwt(
+      { sub: "user-1", exp: nowPlus(3600) },
+      { secret: "wrong-secret" }
+    );
     const response = await fetch(`${server.baseUrl}/me`, {
       headers: { authorization: `Bearer ${token}` },
     });

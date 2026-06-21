@@ -2,24 +2,26 @@ import { randomUUID } from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Schedule = {
-  id: string;
-  tz: string;
-  hour: number;
-  minute: number;
+interface Schedule {
   frequency: "daily";
+  hour: number;
+  id: string;
+  minute: number;
   on_overlap: "earlier" | "later";
-};
+  tz: string;
+}
 
 const schedules = new Map<string, Schedule>();
 
-type LocalParts = {
-  year: number;
-  month: number;
+const OCCURRENCES_PATH = /^\/schedules\/([^/]+)\/occurrences$/;
+
+interface LocalParts {
   day: number;
   hour: number;
   minute: number;
-};
+  month: number;
+  year: number;
+}
 
 function getLocalParts(tz: string, utcMs: number): LocalParts {
   const fmt = new Intl.DateTimeFormat("en-US", {
@@ -63,7 +65,7 @@ function zonedLocalToUtc(
   day: number,
   hour: number,
   minute: number,
-  overlap: "earlier" | "later",
+  overlap: "earlier" | "later"
 ): number | "gap" {
   const roughStart = Date.UTC(year, month - 1, day - 1, 0, 0, 0);
   const roughEnd = Date.UTC(year, month - 1, day + 1, 23, 59, 59);
@@ -82,9 +84,15 @@ function zonedLocalToUtc(
     }
   }
 
-  if (matches.length === 0) return "gap";
-  if (matches.length === 1) return matches[0]!;
-  return overlap === "earlier" ? matches[0]! : matches[matches.length - 1]!;
+  if (matches.length === 0) {
+    return "gap";
+  }
+  const first = matches[0];
+  const last = matches.at(-1);
+  if (matches.length === 1 || first === undefined || last === undefined) {
+    return first ?? "gap";
+  }
+  return overlap === "earlier" ? first : last;
 }
 
 function parseInstant(raw: string): number | null {
@@ -92,8 +100,14 @@ function parseInstant(raw: string): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
-function expandDaily(schedule: Schedule, fromMs: number, toMs: number): string[] {
-  if (toMs < fromMs) return [];
+function expandDaily(
+  schedule: Schedule,
+  fromMs: number,
+  toMs: number
+): string[] {
+  if (toMs < fromMs) {
+    return [];
+  }
 
   const seenDays = new Set<string>();
   const out: string[] = [];
@@ -103,7 +117,9 @@ function expandDaily(schedule: Schedule, fromMs: number, toMs: number): string[]
   for (let utc = scanStart; utc <= scanEnd; utc += 3_600_000) {
     const local = getLocalParts(schedule.tz, utc);
     const key = localKey(local);
-    if (seenDays.has(key)) continue;
+    if (seenDays.has(key)) {
+      continue;
+    }
     seenDays.add(key);
 
     const instant = zonedLocalToUtc(
@@ -113,9 +129,11 @@ function expandDaily(schedule: Schedule, fromMs: number, toMs: number): string[]
       local.day,
       schedule.hour,
       schedule.minute,
-      schedule.on_overlap,
+      schedule.on_overlap
     );
-    if (instant === "gap") continue;
+    if (instant === "gap") {
+      continue;
+    }
     if (instant >= fromMs && instant <= toMs) {
       out.push(utcIso(instant));
     }
@@ -162,16 +180,16 @@ Bun.serve({
       return Response.json(schedule, { status: 201 });
     }
 
-    const occMatch = /^\/schedules\/([^/]+)\/occurrences$/.exec(url.pathname);
-    if (request.method === "GET" && occMatch) {
-      const id = decodeURIComponent(occMatch[1]!);
+    const occMatch = OCCURRENCES_PATH.exec(url.pathname);
+    if (request.method === "GET" && occMatch?.[1] !== undefined) {
+      const id = decodeURIComponent(occMatch[1]);
       const schedule = schedules.get(id);
       if (!schedule) {
         return Response.json({ error: "not_found" }, { status: 404 });
       }
       const fromRaw = url.searchParams.get("from");
       const toRaw = url.searchParams.get("to");
-      if (!fromRaw || !toRaw) {
+      if (!(fromRaw && toRaw)) {
         return Response.json({ error: "invalid_range" }, { status: 400 });
       }
       const fromMs = parseInstant(fromRaw);

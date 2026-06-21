@@ -1,7 +1,10 @@
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 
-export type RunningServer = { baseUrl: string; stop: () => Promise<void> };
+export interface RunningServer {
+  baseUrl: string;
+  stop: () => Promise<void>;
+}
 
 const taskRoot = resolve(import.meta.dir, "../..");
 
@@ -21,10 +24,18 @@ export async function startTaskServer(): Promise<RunningServer> {
     exited = true;
   });
   for (let attempt = 0; attempt < 50; attempt += 1) {
-    if (exited) throw new Error("server exited before readiness");
+    if (exited) {
+      throw new Error("server exited before readiness");
+    }
     try {
       await fetch(baseUrl);
-      return { baseUrl, stop: async () => { proc.kill(); await Promise.race([exitedPromise, sleep(1000)]); } };
+      return {
+        baseUrl,
+        stop: async () => {
+          proc.kill();
+          await Promise.race([exitedPromise, sleep(1000)]);
+        },
+      };
     } catch {
       await sleep(50);
     }

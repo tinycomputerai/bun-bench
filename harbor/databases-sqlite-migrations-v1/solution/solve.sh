@@ -21,7 +21,10 @@ db.exec("PRAGMA journal_mode = WAL;");
 
 // The ordered migration list. Each migration runs exactly once over the
 // lifetime of the database, recorded in schema_migrations by name.
-type Migration = { name: string; up: () => void };
+interface Migration {
+  name: string;
+  up: () => void;
+}
 
 const migrations: Migration[] = [
   {
@@ -57,12 +60,14 @@ function runMigrations(): void {
   );`);
 
   const isApplied = db.query<{ name: string }, [string]>(
-    "SELECT name FROM schema_migrations WHERE name = ?",
+    "SELECT name FROM schema_migrations WHERE name = ?"
   );
   const record = db.query("INSERT INTO schema_migrations (name) VALUES (?)");
 
   for (const migration of migrations) {
-    if (isApplied.get(migration.name)) continue;
+    if (isApplied.get(migration.name)) {
+      continue;
+    }
     const apply = db.transaction(() => {
       migration.up();
       record.run(migration.name);
@@ -73,7 +78,11 @@ function runMigrations(): void {
 
 runMigrations();
 
-type User = { id: number; name: string; email: string };
+interface User {
+  email: string;
+  id: number;
+  name: string;
+}
 
 Bun.serve({
   port,
@@ -84,11 +93,14 @@ Bun.serve({
     if (request.method === "GET" && url.pathname === "/schema/version") {
       const rows = db
         .query<{ name: string }, []>(
-          "SELECT name FROM schema_migrations ORDER BY id ASC",
+          "SELECT name FROM schema_migrations ORDER BY id ASC"
         )
         .all();
       const applied = rows.map((row) => row.name);
-      return Response.json({ version: applied.length, applied }, { status: 200 });
+      return Response.json(
+        { version: applied.length, applied },
+        { status: 200 }
+      );
     }
 
     if (request.method === "POST" && url.pathname === "/users") {
@@ -99,14 +111,21 @@ Bun.serve({
         return Response.json({ error: "invalid_json" }, { status: 400 });
       }
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.name !== "string" || typeof record.email !== "string") {
+      if (
+        !record ||
+        typeof record.name !== "string" ||
+        typeof record.email !== "string"
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const created = db
         .query<User, [string, string]>(
-          "INSERT INTO users (name, email) VALUES (?, ?) RETURNING id, name, email",
+          "INSERT INTO users (name, email) VALUES (?, ?) RETURNING id, name, email"
         )
-        .get(record.name, record.email)!;
+        .get(record.name, record.email);
+      if (!created) {
+        return Response.json({ error: "insert_failed" }, { status: 500 });
+      }
       return Response.json(created, { status: 201 });
     }
 
@@ -122,7 +141,9 @@ Bun.serve({
       const user = db
         .query<User, [number]>("SELECT id, name, email FROM users WHERE id = ?")
         .get(id);
-      if (!user) return Response.json({ error: "not_found" }, { status: 404 });
+      if (!user) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
       return Response.json(user, { status: 200 });
     }
 

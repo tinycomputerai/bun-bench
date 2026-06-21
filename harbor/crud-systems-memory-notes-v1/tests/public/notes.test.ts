@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("notes API", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("notes API", () => {
   });
 
   test("creates and lists a note", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const created = await fetch(`${server.baseUrl}/notes`, {
       method: "POST",
@@ -25,6 +27,8 @@ describe("notes API", () => {
     expect(created.status).toBe(201);
     expect(await created.json()).toEqual({ id: "note_1", text: "first note" });
     expect(listed.status).toBe(200);
-    expect(await listed.json()).toEqual({ notes: [{ id: "note_1", text: "first note" }] });
+    expect(await listed.json()).toEqual({
+      notes: [{ id: "note_1", text: "first note" }],
+    });
   });
 });

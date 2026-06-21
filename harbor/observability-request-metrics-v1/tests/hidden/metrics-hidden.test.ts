@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 function counterValue(
   text: string,
   method: string,
   route: string,
-  status: string,
+  status: string
 ): number {
   const needle = `http_requests_total{method="${method}",route="${route}",status="${status}"}`;
   for (const line of text.split("\n")) {
@@ -19,18 +19,21 @@ function counterValue(
 
 function globalLine(text: string, name: string): number {
   for (const line of text.split("\n")) {
-    if (line.startsWith(name + " ")) {
+    if (line.startsWith(`${name} `)) {
       return Number(line.slice(name.length).trim());
     }
   }
-  return NaN;
+  return Number.NaN;
 }
 
 // Count how many distinct counter series exist for a given route.
 function seriesForRoute(text: string, route: string): number {
   let n = 0;
   for (const line of text.split("\n")) {
-    if (line.startsWith("http_requests_total{") && line.includes(`route="${route}"`)) {
+    if (
+      line.startsWith("http_requests_total{") &&
+      line.includes(`route="${route}"`)
+    ) {
       n += 1;
     }
   }
@@ -53,17 +56,31 @@ describe("request metrics — hidden", () => {
   });
 
   test("3 GET /work requests increment the GET/work/200 counter by exactly 3", async () => {
-    if (!server) throw new Error("server did not start");
-    const before = counterValue(await metricsText(server.baseUrl), "GET", "/work", "200");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const before = counterValue(
+      await metricsText(server.baseUrl),
+      "GET",
+      "/work",
+      "200"
+    );
     for (let i = 0; i < 3; i += 1) {
       await fetch(`${server.baseUrl}/work`);
     }
-    const after = counterValue(await metricsText(server.baseUrl), "GET", "/work", "200");
+    const after = counterValue(
+      await metricsText(server.baseUrl),
+      "GET",
+      "/work",
+      "200"
+    );
     expect(after - before).toBe(3);
   });
 
   test("a 500 (GET /work?fail=1) is counted under status=500 separately from 200", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const t0 = await metricsText(server.baseUrl);
     const ok0 = counterValue(t0, "GET", "/work", "200");
     const fail0 = counterValue(t0, "GET", "/work", "500");
@@ -79,8 +96,15 @@ describe("request metrics — hidden", () => {
   });
 
   test("route templating: /items/1 and /items/2 form a SINGLE series with count +2", async () => {
-    if (!server) throw new Error("server did not start");
-    const before = counterValue(await metricsText(server.baseUrl), "GET", "/items/:id", "200");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const before = counterValue(
+      await metricsText(server.baseUrl),
+      "GET",
+      "/items/:id",
+      "200"
+    );
 
     await fetch(`${server.baseUrl}/items/1`);
     await fetch(`${server.baseUrl}/items/2`);
@@ -94,45 +118,73 @@ describe("request metrics — hidden", () => {
   });
 
   test("GET /items/:id echoes the id in the body", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const r = await fetch(`${server.baseUrl}/items/42`);
     expect(r.status).toBe(200);
     expect(String((await r.json()).id)).toBe("42");
   });
 
   test("unmatched routes are recorded as route=<unmatched> and return 404", async () => {
-    if (!server) throw new Error("server did not start");
-    const before = counterValue(await metricsText(server.baseUrl), "GET", "<unmatched>", "404");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const before = counterValue(
+      await metricsText(server.baseUrl),
+      "GET",
+      "<unmatched>",
+      "404"
+    );
     const r = await fetch(`${server.baseUrl}/no-such-thing`);
     expect(r.status).toBe(404);
-    const after = counterValue(await metricsText(server.baseUrl), "GET", "<unmatched>", "404");
+    const after = counterValue(
+      await metricsText(server.baseUrl),
+      "GET",
+      "<unmatched>",
+      "404"
+    );
     expect(after - before).toBe(1);
   });
 
   test("X-Request-Id is echoed when supplied", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const supplied = "trace-abc-123";
-    const r = await fetch(`${server.baseUrl}/work`, { headers: { "x-request-id": supplied } });
+    const r = await fetch(`${server.baseUrl}/work`, {
+      headers: { "x-request-id": supplied },
+    });
     expect(r.headers.get("x-request-id")).toBe(supplied);
   });
 
   test("X-Request-Id is generated (non-empty) when not supplied, and differs per request", async () => {
-    if (!server) throw new Error("server did not start");
-    const a = (await fetch(`${server.baseUrl}/work`)).headers.get("x-request-id");
-    const b = (await fetch(`${server.baseUrl}/work`)).headers.get("x-request-id");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const a = (await fetch(`${server.baseUrl}/work`)).headers.get(
+      "x-request-id"
+    );
+    const b = (await fetch(`${server.baseUrl}/work`)).headers.get(
+      "x-request-id"
+    );
     expect(a).toBeTruthy();
     expect(b).toBeTruthy();
     expect(a).not.toBe(b);
     // An empty supplied id is treated as absent → generated.
     const c = (
-      await fetch(`${server.baseUrl}/work`, { headers: { "x-request-id": "   " } })
+      await fetch(`${server.baseUrl}/work`, {
+        headers: { "x-request-id": "   " },
+      })
     ).headers.get("x-request-id");
     expect(c).toBeTruthy();
     expect(c!.trim().length).toBeGreaterThan(0);
   });
 
   test("/metrics calls do not appear in http_requests_total", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // Hit /metrics several times; it must never create a counter series for itself.
     await metricsText(server.baseUrl);
     await metricsText(server.baseUrl);
@@ -142,13 +194,28 @@ describe("request metrics — hidden", () => {
   });
 
   test("duration count increases with handled requests and excludes /metrics", async () => {
-    if (!server) throw new Error("server did not start");
-    const before = globalLine(await metricsText(server.baseUrl), "http_request_duration_ms_count");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const before = globalLine(
+      await metricsText(server.baseUrl),
+      "http_request_duration_ms_count"
+    );
     await fetch(`${server.baseUrl}/work`);
     await fetch(`${server.baseUrl}/work`);
     // Reading metrics in between must not add to the duration count.
-    const after = globalLine(await metricsText(server.baseUrl), "http_request_duration_ms_count");
+    const after = globalLine(
+      await metricsText(server.baseUrl),
+      "http_request_duration_ms_count"
+    );
     expect(after - before).toBe(2);
-    expect(Number.isFinite(globalLine(await metricsText(server.baseUrl), "http_request_duration_ms_sum"))).toBe(true);
+    expect(
+      Number.isFinite(
+        globalLine(
+          await metricsText(server.baseUrl),
+          "http_request_duration_ms_sum"
+        )
+      )
+    ).toBe(true);
   });
 });

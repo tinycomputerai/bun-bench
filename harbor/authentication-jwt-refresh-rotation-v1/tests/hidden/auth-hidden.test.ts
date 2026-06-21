@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
-async function login(baseUrl: string, username = "alice", password = "password123") {
+function login(baseUrl: string, username = "alice", password = "password123") {
   return fetch(`${baseUrl}/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -9,7 +9,7 @@ async function login(baseUrl: string, username = "alice", password = "password12
   });
 }
 
-async function refresh(baseUrl: string, token: string) {
+function refresh(baseUrl: string, token: string) {
   return fetch(`${baseUrl}/refresh`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -29,9 +29,13 @@ describe("refresh rotation hardening", () => {
   });
 
   test("the old refresh token no longer works after a rotation", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const first = await (await login(server.baseUrl)).json();
-    const rotated = await (await refresh(server.baseUrl, first.refresh_token)).json();
+    const rotated = await (
+      await refresh(server.baseUrl, first.refresh_token)
+    ).json();
     expect(typeof rotated.refresh_token).toBe("string");
     expect(rotated.refresh_token).not.toBe(first.refresh_token);
 
@@ -39,21 +43,27 @@ describe("refresh rotation hardening", () => {
     const reuse = await refresh(server.baseUrl, first.refresh_token);
     expect(reuse.status).toBe(401);
     expect(["invalid_refresh", "token_reuse_detected"]).toContain(
-      (await reuse.json()).error,
+      (await reuse.json()).error
     );
   });
 
   test("an unknown refresh token is invalid_refresh", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await refresh(server.baseUrl, "not-a-real-token-deadbeef");
     expect(response.status).toBe(401);
     expect((await response.json()).error).toBe("invalid_refresh");
   });
 
   test("reusing a rotated-out token revokes the whole family, killing the current token too", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const first = await (await login(server.baseUrl)).json();
-    const second = await (await refresh(server.baseUrl, first.refresh_token)).json();
+    const second = await (
+      await refresh(server.baseUrl, first.refresh_token)
+    ).json();
     // second.refresh_token is now the currently-valid token for this family.
 
     // Reuse the already-consumed first token -> reuse detected, family revoked.
@@ -68,7 +78,9 @@ describe("refresh rotation hardening", () => {
   });
 
   test("revoking one family does not affect a different family", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // Family A — trigger reuse revocation.
     const a1 = await (await login(server.baseUrl)).json();
     await refresh(server.baseUrl, a1.refresh_token); // consume a1
@@ -81,7 +93,9 @@ describe("refresh rotation hardening", () => {
   });
 
   test("a chain of rotations works and only the latest token is valid", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     let current = (await (await login(server.baseUrl)).json()).refresh_token;
     const history: string[] = [current];
     for (let i = 0; i < 4; i += 1) {
@@ -98,7 +112,9 @@ describe("refresh rotation hardening", () => {
   });
 
   test("an invalid access token is rejected by /protected", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/protected`, {
       headers: { authorization: "Bearer not.a.jwt" },
     });
@@ -106,7 +122,9 @@ describe("refresh rotation hardening", () => {
   });
 
   test("a missing Authorization header is rejected by /protected", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/protected`);
     expect(response.status).toBe(401);
   });

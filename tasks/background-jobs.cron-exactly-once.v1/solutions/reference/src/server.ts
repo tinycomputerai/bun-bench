@@ -1,20 +1,20 @@
 const port = Number(Bun.env.PORT ?? 3000);
 
-type RunRecord = {
+interface RunRecord {
+  completed_at?: number;
   job: string;
   scheduled_time: number;
-  status: "running" | "completed" | "skipped";
   started_at?: number;
-  completed_at?: number;
-};
+  status: "running" | "completed" | "skipped";
+}
 
-type JobConfig = {
-  name: string;
+interface JobConfig {
   interval_ms: number;
   missed_policy: "catch_up" | "skip";
+  name: string;
   registered_at: number;
   running: boolean;
-};
+}
 
 const jobs = new Map<string, JobConfig>();
 const completedSlots = new Map<string, Set<number>>();
@@ -39,7 +39,9 @@ function isCompleted(job: string, slot: number): boolean {
 
 function lastCompletedSlot(job: string): number | null {
   const set = completedSlots.get(job);
-  if (!set || set.size === 0) return null;
+  if (!set || set.size === 0) {
+    return null;
+  }
   return Math.max(...set);
 }
 
@@ -50,17 +52,26 @@ function pendingSlots(config: JobConfig, now: number): number[] {
   let cursor = last === null ? start : last + config.interval_ms;
   const slots: number[] = [];
   while (cursor <= current) {
-    if (!isCompleted(config.name, cursor)) slots.push(cursor);
+    if (!isCompleted(config.name, cursor)) {
+      slots.push(cursor);
+    }
     cursor += config.interval_ms;
   }
-  if (config.missed_policy === "skip" && slots.length > 0) {
-    return [slots.at(-1)!];
+  const lastSlot = slots.at(-1);
+  if (config.missed_policy === "skip" && lastSlot !== undefined) {
+    return [lastSlot];
   }
   return slots;
 }
 
-async function executeRun(jobName: string, slot: number, config: JobConfig): Promise<void> {
-  if (isCompleted(jobName, slot)) return;
+async function executeRun(
+  jobName: string,
+  slot: number,
+  config: JobConfig
+): Promise<void> {
+  if (isCompleted(jobName, slot)) {
+    return;
+  }
   if (config.running) {
     if (config.missed_policy === "skip") {
       runs.push({ job: jobName, scheduled_time: slot, status: "skipped" });
@@ -68,7 +79,12 @@ async function executeRun(jobName: string, slot: number, config: JobConfig): Pro
     return;
   }
   config.running = true;
-  const record: RunRecord = { job: jobName, scheduled_time: slot, status: "running", started_at: Date.now() };
+  const record: RunRecord = {
+    job: jobName,
+    scheduled_time: slot,
+    status: "running",
+    started_at: Date.now(),
+  };
   runs.push(record);
   await new Promise((r) => setTimeout(r, 80));
   record.status = "completed";
@@ -77,19 +93,19 @@ async function executeRun(jobName: string, slot: number, config: JobConfig): Pro
   config.running = false;
 }
 
-async function tick(): Promise<void> {
+function tick(): void {
   const now = Date.now();
   for (const [name, config] of jobs) {
     for (const slot of pendingSlots(config, now)) {
       if (!isCompleted(name, slot)) {
-        void executeRun(name, slot, config);
+        executeRun(name, slot, config).catch(() => undefined);
       }
     }
   }
 }
 
 setInterval(() => {
-  void tick();
+  tick();
 }, 50);
 
 Bun.serve({
@@ -104,7 +120,11 @@ Bun.serve({
     if (request.method === "POST" && url.pathname === "/jobs") {
       const body = await request.json().catch(() => null);
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.name !== "string" || !Number.isInteger(record.interval_ms)) {
+      if (
+        !record ||
+        typeof record.name !== "string" ||
+        !Number.isInteger(record.interval_ms)
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const policy = record.missed_policy === "catch_up" ? "catch_up" : "skip";
@@ -116,7 +136,14 @@ Bun.serve({
         running: false,
       });
       completedSlots.set(record.name, new Set());
-      return Response.json({ name: record.name, interval_ms: record.interval_ms, missed_policy: policy }, { status: 201 });
+      return Response.json(
+        {
+          name: record.name,
+          interval_ms: record.interval_ms,
+          missed_policy: policy,
+        },
+        { status: 201 }
+      );
     }
 
     if (request.method === "GET" && url.pathname === "/runs") {

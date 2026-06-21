@@ -9,24 +9,33 @@ import { createHash, randomUUID } from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Upload = {
-  id: string;
-  total_size: number;
+interface Upload {
   chunk_size: number;
   chunks: Map<number, Buffer>;
   complete: boolean;
-};
+  id: string;
+  total_size: number;
+}
 
 const uploads = new Map<string, Upload>();
 const uploadLocks = new Map<string, Promise<void>>();
 
-async function withUploadLock<T>(id: string, fn: () => T | Promise<T>): Promise<T> {
+const UPLOAD_PATH = /^\/uploads\/([^/]+)(?:\/(chunks|complete))?$/;
+const INTEGER_RE = /^-?\d+$/;
+
+async function withUploadLock<T>(
+  id: string,
+  fn: () => T | Promise<T>
+): Promise<T> {
   const prev = uploadLocks.get(id) ?? Promise.resolve();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  uploadLocks.set(id, prev.then(() => gate));
+  uploadLocks.set(
+    id,
+    prev.then(() => gate)
+  );
   await prev;
   try {
     return await fn();
@@ -46,7 +55,9 @@ function receivedRanges(upload: Upload): Array<{ start: number; end: number }> {
 
 function allRangesPresent(upload: Upload): boolean {
   let covered = 0;
-  for (const [, buf] of upload.chunks) covered += buf.length;
+  for (const [, buf] of upload.chunks) {
+    covered += buf.length;
+  }
   return covered === upload.total_size;
 }
 
@@ -62,10 +73,15 @@ Bun.serve({
     if (request.method === "POST" && url.pathname === "/uploads") {
       const body = await request.json().catch(() => null);
       const record = body as Record<string, unknown> | null;
-      if (!record || !Number.isInteger(record.total_size) || (record.total_size as number) <= 0) {
+      if (
+        !(record && Number.isInteger(record.total_size)) ||
+        (record.total_size as number) <= 0
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
-      const chunk_size = Number.isInteger(record.chunk_size) ? (record.chunk_size as number) : 1024;
+      const chunk_size = Number.isInteger(record.chunk_size)
+        ? (record.chunk_size as number)
+        : 1024;
       const id = randomUUID();
       uploads.set(id, {
         id,
@@ -74,16 +90,28 @@ Bun.serve({
         chunks: new Map(),
         complete: false,
       });
-      return Response.json({ upload_id: id, chunk_size, total_size: record.total_size }, { status: 201 });
+      return Response.json(
+        { upload_id: id, chunk_size, total_size: record.total_size },
+        { status: 201 }
+      );
     }
 
-    const uploadMatch = /^\/uploads\/([^/]+)(?:\/(chunks|complete))?$/.exec(url.pathname);
-    if (!uploadMatch) return Response.json({ error: "not_found" }, { status: 404 });
-    const uploadId = decodeURIComponent(uploadMatch[1]!);
+    const uploadMatch = UPLOAD_PATH.exec(url.pathname);
+    if (!uploadMatch || uploadMatch[1] === undefined) {
+      return Response.json({ error: "not_found" }, { status: 404 });
+    }
+    const uploadId = decodeURIComponent(uploadMatch[1]);
     const upload = uploads.get(uploadId);
-    if (!upload) return Response.json({ error: "not_found" }, { status: 404 });
+    if (!upload) {
+      return Response.json({ error: "not_found" }, { status: 404 });
+    }
 
-    if (request.method === "GET" && uploadMatch && uploadMatch[2] !== "chunks" && uploadMatch[2] !== "complete") {
+    if (
+      request.method === "GET" &&
+      uploadMatch &&
+      uploadMatch[2] !== "chunks" &&
+      uploadMatch[2] !== "complete"
+    ) {
       return Response.json(
         {
           upload_id: upload.id,
@@ -92,13 +120,13 @@ Bun.serve({
           complete: upload.complete,
           received: receivedRanges(upload),
         },
-        { status: 200 },
+        { status: 200 }
       );
     }
 
     if (request.method === "PUT" && uploadMatch[2] === "chunks") {
       const offsetRaw = url.searchParams.get("offset");
-      if (offsetRaw === null || !/^-?\d+$/.test(offsetRaw)) {
+      if (offsetRaw === null || !INTEGER_RE.test(offsetRaw)) {
         return Response.json({ error: "invalid_offset" }, { status: 400 });
       }
       const offset = Number(offsetRaw);
@@ -106,14 +134,19 @@ Bun.serve({
         return Response.json({ error: "invalid_offset" }, { status: 400 });
       }
       const data = Buffer.from(await request.arrayBuffer());
-      if (data.length === 0) return Response.json({ error: "empty_chunk" }, { status: 400 });
+      if (data.length === 0) {
+        return Response.json({ error: "empty_chunk" }, { status: 400 });
+      }
       if (offset + data.length > upload.total_size) {
         return Response.json({ error: "chunk_overflow" }, { status: 400 });
       }
 
       return withUploadLock(uploadId, () => {
         upload.chunks.set(offset, data);
-        return Response.json({ ok: true, offset, size: data.length }, { status: 200 });
+        return Response.json(
+          { ok: true, offset, size: data.length },
+          { status: 200 }
+        );
       });
     }
 
@@ -124,7 +157,10 @@ Bun.serve({
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       if (!allRangesPresent(upload)) {
-        return Response.json({ error: "incomplete", missing: receivedRanges(upload) }, { status: 409 });
+        return Response.json(
+          { error: "incomplete", missing: receivedRanges(upload) },
+          { status: 409 }
+        );
       }
       const assembled = Buffer.alloc(upload.total_size);
       for (const [offset, buf] of upload.chunks) {
@@ -135,7 +171,10 @@ Bun.serve({
         return Response.json({ error: "checksum_mismatch" }, { status: 422 });
       }
       upload.complete = true;
-      return Response.json({ upload_id: upload.id, complete: true, sha256: hash }, { status: 200 });
+      return Response.json(
+        { upload_id: upload.id, complete: true, sha256: hash },
+        { status: 200 }
+      );
     }
 
     return Response.json({ error: "not_found" }, { status: 404 });

@@ -1,10 +1,10 @@
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 
-export type RunningServer = {
+export interface RunningServer {
   baseUrl: string;
   stop: () => Promise<void>;
-};
+}
 
 const taskRoot = resolve(import.meta.dir, "../..");
 
@@ -31,7 +31,9 @@ export async function startTaskServer(): Promise<RunningServer> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     if (exited) {
       const [stdoutText, stderrText] = await Promise.all([stdout, stderr]);
-      throw new Error(`server exited before readiness\nstdout:\n${stdoutText}\nstderr:\n${stderrText}`);
+      throw new Error(
+        `server exited before readiness\nstdout:\n${stdoutText}\nstderr:\n${stderrText}`
+      );
     }
 
     try {
@@ -50,7 +52,9 @@ export async function startTaskServer(): Promise<RunningServer> {
 
   proc.kill();
   const [stdoutText, stderrText] = await Promise.all([stdout, stderr]);
-  throw new Error(`server did not become reachable\nstdout:\n${stdoutText}\nstderr:\n${stderrText}`);
+  throw new Error(
+    `server did not become reachable\nstdout:\n${stdoutText}\nstderr:\n${stderrText}`
+  );
 }
 
 function getAvailablePort(): Promise<number> {
@@ -70,7 +74,9 @@ function getAvailablePort(): Promise<number> {
   });
 }
 
-async function collectStream(stream: ReadableStream<Uint8Array> | null): Promise<string> {
+async function collectStream(
+  stream: ReadableStream<Uint8Array> | null
+): Promise<string> {
   if (!stream) {
     return "";
   }

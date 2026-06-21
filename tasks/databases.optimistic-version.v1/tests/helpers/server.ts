@@ -1,9 +1,12 @@
-import { createServer } from "node:net";
 import { mkdtempSync } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-export type RunningServer = { baseUrl: string; stop: () => Promise<void> };
+export interface RunningServer {
+  baseUrl: string;
+  stop: () => Promise<void>;
+}
 
 const taskRoot = resolve(import.meta.dir, "../..");
 // One database file per test-file module load. Persists across restarts within
@@ -27,7 +30,9 @@ export async function startTaskServer(): Promise<RunningServer> {
     exited = true;
   });
   for (let attempt = 0; attempt < 80; attempt += 1) {
-    if (exited) throw new Error("server exited before readiness");
+    if (exited) {
+      throw new Error("server exited before readiness");
+    }
     try {
       await fetch(baseUrl);
       return {

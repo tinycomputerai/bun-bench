@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let counter = 0;
 function freshKey() {
@@ -19,10 +19,15 @@ describe("idempotent payment capture", () => {
   });
 
   test("first capture for a key returns 201 captured payment", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/payments`, {
       method: "POST",
-      headers: { "content-type": "application/json", "Idempotency-Key": freshKey() },
+      headers: {
+        "content-type": "application/json",
+        "Idempotency-Key": freshKey(),
+      },
       body: JSON.stringify({ amount: 100, currency: "USD" }),
     });
     expect(response.status).toBe(201);
@@ -34,11 +39,16 @@ describe("idempotent payment capture", () => {
   });
 
   test("the captured payment is readable via GET /payments/:id", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await (
       await fetch(`${server.baseUrl}/payments`, {
         method: "POST",
-        headers: { "content-type": "application/json", "Idempotency-Key": freshKey() },
+        headers: {
+          "content-type": "application/json",
+          "Idempotency-Key": freshKey(),
+        },
         body: JSON.stringify({ amount: 250, currency: "EUR" }),
       })
     ).json();
@@ -51,7 +61,9 @@ describe("idempotent payment capture", () => {
   });
 
   test("missing Idempotency-Key is rejected with 400", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/payments`, {
       method: "POST",
       headers: { "content-type": "application/json" },

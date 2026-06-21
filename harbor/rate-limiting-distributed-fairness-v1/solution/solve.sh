@@ -10,10 +10,10 @@ const port = Number(Bun.env.PORT ?? 3000);
 const LIMIT = 10;
 const WINDOW_MS = 1000;
 
-type ClientWindow = {
-  windowStart: number;
+interface ClientWindow {
   count: number;
-};
+  windowStart: number;
+}
 
 const store = new Map<string, ClientWindow>();
 
@@ -67,7 +67,7 @@ Bun.serve({
       }
 
       // Ignore client-supplied clock hints (skew must not grant extra budget).
-      void request.headers.get("x-client-time");
+      request.headers.get("x-client-time");
 
       const outcome = admit(clientId);
       const headers: Record<string, string> = {
@@ -78,7 +78,10 @@ Bun.serve({
 
       if (!outcome.allowed) {
         headers["Retry-After"] = String(outcome.retryAfter ?? 1);
-        return Response.json({ error: "rate_limited" }, { status: 429, headers });
+        return Response.json(
+          { error: "rate_limited" },
+          { status: 429, headers }
+        );
       }
 
       return Response.json({ ok: true }, { status: 200, headers });

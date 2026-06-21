@@ -2,16 +2,18 @@ import { createHash } from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Variant = {
+const GZIP_TOKEN = /\bgzip\b/;
+
+interface Variant {
   body: string;
   etag: string;
   lastModified: string;
-};
+}
 
-type Document = {
+interface Document {
   updatedAt: number;
   variants: Map<string, Variant>;
-};
+}
 
 let document: Document = createDocument("hello");
 
@@ -21,6 +23,14 @@ function hashBody(body: string): string {
 
 function httpDate(ms: number): string {
   return new Date(ms).toUTCString();
+}
+
+function getVariant(doc: Document, encoding: string): Variant {
+  const variant = doc.variants.get(encoding);
+  if (!variant) {
+    throw new Error(`missing variant: ${encoding}`);
+  }
+  return variant;
 }
 
 function createDocument(body: string): Document {
@@ -44,23 +54,38 @@ function createDocument(body: string): Document {
 
 function pickEncoding(request: Request): "identity" | "gzip" {
   const accept = request.headers.get("accept-encoding") ?? "";
-  if (/\bgzip\b/.test(accept)) return "gzip";
+  if (GZIP_TOKEN.test(accept)) {
+    return "gzip";
+  }
   return "identity";
 }
 
 function parseEtags(header: string | null): string[] {
-  if (!header) return [];
-  return header.split(",").map((part) => part.trim()).filter(Boolean);
+  if (!header) {
+    return [];
+  }
+  return header
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 function etagMatches(ifNoneMatch: string, etag: string): boolean {
-  if (ifNoneMatch.trim() === "*") return true;
+  if (ifNoneMatch.trim() === "*") {
+    return true;
+  }
   const candidates = parseEtags(ifNoneMatch);
   const weakTarget = etag.startsWith("W/") ? etag : `W/${etag}`;
   return candidates.some((candidate) => {
-    if (candidate === "*") return true;
-    if (candidate === etag) return true;
-    const normalized = candidate.startsWith("W/") ? candidate : `W/${candidate}`;
+    if (candidate === "*") {
+      return true;
+    }
+    if (candidate === etag) {
+      return true;
+    }
+    const normalized = candidate.startsWith("W/")
+      ? candidate
+      : `W/${candidate}`;
     return normalized === weakTarget;
   });
 }
@@ -68,26 +93,30 @@ function etagMatches(ifNoneMatch: string, etag: string): boolean {
 function strongEtagMatches(ifMatch: string, etag: string): boolean {
   const strong = etag.startsWith("W/") ? etag.slice(2) : etag;
   return parseEtags(ifMatch).some((candidate) => {
-    if (candidate.startsWith("W/")) return false;
+    if (candidate.startsWith("W/")) {
+      return false;
+    }
     return candidate === strong;
   });
 }
 
 function parseHttpDate(value: string | null): number | null {
-  if (!value) return null;
+  if (!value) {
+    return null;
+  }
   const ms = Date.parse(value);
   return Number.isFinite(ms) ? ms : null;
 }
 
-type CacheEntry = {
+interface CacheEntry {
   body: string;
-  etag: string;
-  lastModified: string;
   cacheControl: string;
   encoding: string;
-  storedAt: number;
+  etag: string;
+  lastModified: string;
   maxAgeMs: number;
-};
+  storedAt: number;
+}
 
 const cacheStore = new Map<string, CacheEntry>();
 
@@ -97,7 +126,7 @@ function cacheKey(encoding: string): string {
 
 function originGet(request: Request): Response {
   const encoding = pickEncoding(request);
-  const variant = document.variants.get(encoding)!;
+  const variant = getVariant(document, encoding);
   const ifNoneMatch = request.headers.get("if-none-match");
   const ifModifiedSince = request.headers.get("if-modified-since");
 
@@ -197,7 +226,7 @@ async function cachedGet(request: Request): Promise<Response> {
   });
 }
 
-async function awaitText(response: Response): Promise<string> {
+function awaitText(response: Response): Promise<string> {
   return response.text();
 }
 
@@ -220,14 +249,14 @@ Bun.serve({
 
     if (request.method === "PUT" && url.pathname === "/resource") {
       const ifMatch = request.headers.get("if-match");
-      const variant = document.variants.get("identity")!;
-      if (!ifMatch || !strongEtagMatches(ifMatch, variant.etag)) {
+      const variant = getVariant(document, "identity");
+      if (!(ifMatch && strongEtagMatches(ifMatch, variant.etag))) {
         return Response.json({ error: "precondition_failed" }, { status: 412 });
       }
       const body = await request.text();
       document = createDocument(body);
       cacheStore.clear();
-      const updated = document.variants.get("identity")!;
+      const updated = getVariant(document, "identity");
       return new Response(updated.body, {
         status: 200,
         headers: {

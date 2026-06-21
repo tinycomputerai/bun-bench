@@ -2,26 +2,29 @@ import { randomUUID } from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-type EventRecord = {
-  id: string;
+interface EventRecord {
   aggregate_id: string;
-  version: number;
-  type: string;
   data: Record<string, unknown>;
+  id: string;
   quarantined: boolean;
-};
+  type: string;
+  version: number;
+}
 
-type Projection = {
+interface Projection {
   aggregate_id: string;
+  last_version: number;
   name: string;
   total: number;
-  last_version: number;
-};
+}
 
 const events: EventRecord[] = [];
 const projections = new Map<string, Projection>();
 const pendingByAggregate = new Map<string, Map<number, EventRecord>>();
 const aggregateLocks = new Map<string, Promise<void>>();
+
+const PROJECTION_PATH = /^\/projections\/([^/]+)$/;
+const REBUILD_PATH = /^\/projections\/([^/]+)\/rebuild$/;
 
 function defaultProjection(aggregateId: string): Projection {
   return { aggregate_id: aggregateId, name: "", total: 0, last_version: 0 };
@@ -36,17 +39,26 @@ function getProjection(aggregateId: string): Projection {
   return projection;
 }
 
-function dataEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
+function dataEqual(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>
+): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-async function withAggregateLock<T>(aggregateId: string, fn: () => T | Promise<T>): Promise<T> {
+async function withAggregateLock<T>(
+  aggregateId: string,
+  fn: () => T | Promise<T>
+): Promise<T> {
   const prev = aggregateLocks.get(aggregateId) ?? Promise.resolve();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  aggregateLocks.set(aggregateId, prev.then(() => gate));
+  aggregateLocks.set(
+    aggregateId,
+    prev.then(() => gate)
+  );
   await prev;
   try {
     return await fn();
@@ -56,7 +68,9 @@ async function withAggregateLock<T>(aggregateId: string, fn: () => T | Promise<T
 }
 
 function applyEvent(projection: Projection, event: EventRecord): void {
-  if (event.quarantined) return;
+  if (event.quarantined) {
+    return;
+  }
   if (event.type === "created") {
     projection.name = String(event.data.name ?? "");
   } else if (event.type === "increment") {
@@ -67,10 +81,14 @@ function applyEvent(projection: Projection, event: EventRecord): void {
 
 function drainPending(aggregateId: string, projection: Projection): void {
   const pending = pendingByAggregate.get(aggregateId);
-  if (!pending) return;
+  if (!pending) {
+    return;
+  }
   for (;;) {
     const next = pending.get(projection.last_version + 1);
-    if (!next) break;
+    if (!next) {
+      break;
+    }
     applyEvent(projection, next);
     pending.delete(next.version);
   }
@@ -80,9 +98,13 @@ function drainPending(aggregateId: string, projection: Projection): void {
 }
 
 function ingestEvent(event: EventRecord): void {
-  if (event.quarantined) return;
+  if (event.quarantined) {
+    return;
+  }
   const projection = getProjection(event.aggregate_id);
-  if (event.version <= projection.last_version) return;
+  if (event.version <= projection.last_version) {
+    return;
+  }
   if (event.version > projection.last_version + 1) {
     let pending = pendingByAggregate.get(event.aggregate_id);
     if (!pending) {
@@ -102,7 +124,9 @@ function rebuildProjection(aggregateId: string): Projection {
     .filter((e) => e.aggregate_id === aggregateId && !e.quarantined)
     .sort((a, b) => a.version - b.version);
   for (const event of ordered) {
-    if (event.version !== fresh.last_version + 1) break;
+    if (event.version !== fresh.last_version + 1) {
+      break;
+    }
     applyEvent(fresh, event);
   }
   projections.set(aggregateId, fresh);
@@ -121,7 +145,9 @@ function publicProjection(projection: Projection): object {
 
 function maxPendingVersion(aggregateId: string): number {
   const pending = pendingByAggregate.get(aggregateId);
-  if (!pending || pending.size === 0) return 0;
+  if (!pending || pending.size === 0) {
+    return 0;
+  }
   return Math.max(...pending.keys());
 }
 
@@ -163,13 +189,18 @@ Bun.serve({
 
       return withAggregateLock(aggregateId, () => {
         const existing = events.find(
-          (e) => e.aggregate_id === aggregateId && e.version === version,
+          (e) => e.aggregate_id === aggregateId && e.version === version
         );
         if (existing) {
           if (existing.type === type && dataEqual(existing.data, data)) {
             return Response.json(
-              { id: existing.id, aggregate_id: aggregateId, version, duplicate: true },
-              { status: 200 },
+              {
+                id: existing.id,
+                aggregate_id: aggregateId,
+                version,
+                duplicate: true,
+              },
+              { status: 200 }
             );
           }
           return Response.json({ error: "version_conflict" }, { status: 409 });
@@ -178,7 +209,7 @@ Bun.serve({
         const projection = getProjection(aggregateId);
         const nextAllowed = Math.max(
           projection.last_version + 1,
-          maxPendingVersion(aggregateId),
+          maxPendingVersion(aggregateId)
         );
         if (version > nextAllowed + 1) {
           return Response.json({ error: "gap_not_allowed" }, { status: 409 });
@@ -197,21 +228,23 @@ Bun.serve({
 
         return Response.json(
           { id: event.id, aggregate_id: aggregateId, version, quarantined },
-          { status: 201 },
+          { status: 201 }
         );
       });
     }
 
-    const projectionMatch = /^\/projections\/([^/]+)$/.exec(url.pathname);
-    if (request.method === "GET" && projectionMatch) {
-      const aggregateId = decodeURIComponent(projectionMatch[1]!);
-      return Response.json(publicProjection(getProjection(aggregateId)), { status: 200 });
+    const projectionMatch = PROJECTION_PATH.exec(url.pathname);
+    if (request.method === "GET" && projectionMatch?.[1] !== undefined) {
+      const aggregateId = decodeURIComponent(projectionMatch[1]);
+      return Response.json(publicProjection(getProjection(aggregateId)), {
+        status: 200,
+      });
     }
 
-    const rebuildMatch = /^\/projections\/([^/]+)\/rebuild$/.exec(url.pathname);
-    if (request.method === "POST" && rebuildMatch) {
-      const aggregateId = decodeURIComponent(rebuildMatch[1]!);
-      const before = publicProjection(getProjection(aggregateId));
+    const rebuildMatch = REBUILD_PATH.exec(url.pathname);
+    if (request.method === "POST" && rebuildMatch?.[1] !== undefined) {
+      const aggregateId = decodeURIComponent(rebuildMatch[1]);
+      const _before = publicProjection(getProjection(aggregateId));
       rebuildProjection(aggregateId);
       const after = publicProjection(getProjection(aggregateId));
       return Response.json(after, { status: 200 });

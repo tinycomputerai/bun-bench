@@ -11,12 +11,12 @@ retry with backoff, dead-lettering, and idempotent side effects.
 
 ### Payload conventions
 
-| Payload | Behavior |
-|---------|----------|
-| `ok` | Succeed immediately |
+| Payload       | Behavior                                            |
+| ------------- | --------------------------------------------------- |
+| `ok`          | Succeed immediately                                 |
 | `transient:N` | Fail transiently for first N attempts, then succeed |
-| `permanent` | Permanent failure — no retry |
-| `poison` | Always transient until retry budget exhausted |
+| `permanent`   | Permanent failure — no retry                        |
+| `poison`      | Always transient until retry budget exhausted       |
 
 Maximum **4** attempts (1 initial + 3 retries) before dead-letter.
 

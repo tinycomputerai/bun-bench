@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function compute(baseUrl: string, key: string) {
+function compute(baseUrl: string, key: string) {
   return fetch(`${baseUrl}/compute/${encodeURIComponent(key)}`);
 }
 
@@ -25,29 +25,33 @@ describe("cache stampede hidden", () => {
   });
 
   test("concurrent misses invoke compute exactly once", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const key = "hid-stampede";
     const results = await Promise.all(
-      Array.from({ length: 25 }, () => compute(server.baseUrl, key)),
+      Array.from({ length: 25 }, () => compute(server.baseUrl, key))
     );
     const values = new Set(
-      (
-        await Promise.all(
-          results.map(async (r) => {
-            expect(r.status).toBe(200);
-            return (await r.json()).value;
-          }),
-        )
-      ),
+      await Promise.all(
+        results.map(async (r) => {
+          expect(r.status).toBe(200);
+          return (await r.json()).value;
+        })
+      )
     );
     expect(values.size).toBe(1);
     expect((await stats(server.baseUrl)).invocations[key]).toBe(1);
   });
 
   test("stampede on key A does not block key B", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const [aResults, bResult] = await Promise.all([
-      Promise.all(Array.from({ length: 10 }, () => compute(server.baseUrl, "hid-block-a"))),
+      Promise.all(
+        Array.from({ length: 10 }, () => compute(server.baseUrl, "hid-block-a"))
+      ),
       compute(server.baseUrl, "hid-block-b"),
     ]);
     expect(bResult.status).toBe(200);
@@ -60,7 +64,9 @@ describe("cache stampede hidden", () => {
   });
 
   test("stale-while-revalidate serves stale immediately with one background refresh", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const key = "hid-swr";
     await compute(server.baseUrl, key);
     await sleep(350);
@@ -72,7 +78,9 @@ describe("cache stampede hidden", () => {
   });
 
   test("negative cache expires and allows recovery", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const key = "fail-recover";
     const first = await compute(server.baseUrl, key);
     expect(first.status).toBe(503);
@@ -87,7 +95,9 @@ describe("cache stampede hidden", () => {
   });
 
   test("bounded cache evicts oldest entries without unbounded growth", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     for (let i = 0; i < 22; i += 1) {
       await compute(server.baseUrl, `hid-evict-${i}`);
     }

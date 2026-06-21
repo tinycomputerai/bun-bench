@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 async function createEvent(baseUrl: string, message: string): Promise<number> {
   const response = await fetch(`${baseUrl}/events`, {
@@ -14,7 +14,9 @@ async function createEvent(baseUrl: string, message: string): Promise<number> {
 async function getPage(baseUrl: string, limit: number, cursor?: string) {
   const qs = new URLSearchParams();
   qs.set("limit", String(limit));
-  if (cursor !== undefined) qs.set("cursor", cursor);
+  if (cursor !== undefined) {
+    qs.set("cursor", cursor);
+  }
   const response = await fetch(`${baseUrl}/events?${qs.toString()}`);
   return { status: response.status, body: await response.json() };
 }
@@ -31,7 +33,9 @@ describe("keyset feed edge cases", () => {
   });
 
   test("limit greater than 100 is clamped to 100", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // Create enough events that at least 100 are available on the first page.
     for (let i = 0; i < 105; i += 1) {
       await createEvent(server.baseUrl, `clamp-${i}`);
@@ -46,7 +50,9 @@ describe("keyset feed edge cases", () => {
   });
 
   test("limit of zero or negative returns 400 invalid_limit", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const zero = await getPage(server.baseUrl, 0);
     expect(zero.status).toBe(400);
     expect(zero.body.error).toBe("invalid_limit");
@@ -61,19 +67,27 @@ describe("keyset feed edge cases", () => {
   });
 
   test("a garbage or forged cursor returns 400 invalid_cursor", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const garbage = await getPage(server.baseUrl, 5, "!!!not-base64!!!");
     expect(garbage.status).toBe(400);
     expect(garbage.body.error).toBe("invalid_cursor");
 
     // base64url of a non-numeric payload must also be rejected.
-    const forged = await getPage(server.baseUrl, 5, Buffer.from("hax", "utf8").toString("base64url"));
+    const forged = await getPage(
+      server.baseUrl,
+      5,
+      Buffer.from("hax", "utf8").toString("base64url")
+    );
     expect(forged.status).toBe(400);
     expect(forged.body.error).toBe("invalid_cursor");
   });
 
   test("next_cursor is null on the final page", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // Walk every page from the newest; the terminal page must carry null.
     const limit = 7;
     let cursor: string | undefined;
@@ -85,14 +99,18 @@ describe("keyset feed edge cases", () => {
       lastBody = page.body;
       cursor = page.body.next_cursor ?? undefined;
       guard += 1;
-      if (guard > 1000) throw new Error("pagination did not terminate");
+      if (guard > 1000) {
+        throw new Error("pagination did not terminate");
+      }
     } while (cursor !== undefined);
     expect(lastBody.next_cursor).toBeNull();
     expect(lastBody.items.length).toBeLessThan(limit);
   });
 
   test("stability: inserting newer events does not skip or duplicate older items", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // Seed a known batch and remember its ids.
     const seeded: number[] = [];
     for (let i = 0; i < 6; i += 1) {
@@ -123,7 +141,7 @@ describe("keyset feed edge cases", () => {
     // Every page-2 id is strictly below the page-1 boundary: nothing newer leaks
     // back into an older page, and no older item between the boundary and the
     // page-2 head is skipped.
-    const boundary = page1Ids[page1Ids.length - 1];
+    const boundary = page1Ids.at(-1);
     for (const id of page2Ids) {
       expect(id).toBeLessThan(boundary);
     }
@@ -137,7 +155,9 @@ describe("keyset feed edge cases", () => {
   });
 
   test("exact page boundary yields a cursor whose next page is empty with null", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const limit = 10;
 
     // Count the current feed by walking it with this page size.
@@ -149,9 +169,13 @@ describe("keyset feed edge cases", () => {
         const page = await getPage(server.baseUrl, limit, cursor);
         expect(page.status).toBe(200);
         total += page.body.items.length;
-        if (page.body.next_cursor === null) break;
+        if (page.body.next_cursor === null) {
+          break;
+        }
         cursor = page.body.next_cursor;
-        if (++guard > 10000) throw new Error("pagination did not terminate");
+        if (++guard > 10_000) {
+          throw new Error("pagination did not terminate");
+        }
       }
       return total;
     }
@@ -175,11 +199,17 @@ describe("keyset feed edge cases", () => {
     for (;;) {
       const page = await getPage(server.baseUrl, limit, cursor);
       expect(page.status).toBe(200);
-      if (page.body.items.length === 0) break;
+      if (page.body.items.length === 0) {
+        break;
+      }
       lastFull = page.body;
-      if (page.body.next_cursor === null) break;
+      if (page.body.next_cursor === null) {
+        break;
+      }
       cursor = page.body.next_cursor;
-      if (++guard > 10000) throw new Error("pagination did not terminate");
+      if (++guard > 10_000) {
+        throw new Error("pagination did not terminate");
+      }
     }
 
     expect(lastFull.items.length).toBe(limit);

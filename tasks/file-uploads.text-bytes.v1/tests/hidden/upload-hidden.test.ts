@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("text upload edge cases", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("text upload edge cases", () => {
   });
 
   test("counts UTF-8 bytes", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/upload`, {
       method: "POST",
@@ -26,7 +28,9 @@ describe("text upload edge cases", () => {
   });
 
   test("rejects non-text content types", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/upload`, {
       method: "POST",

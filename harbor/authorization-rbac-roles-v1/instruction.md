@@ -9,12 +9,12 @@ Every request authenticates with a bearer token in the `Authorization` header:
 `Authorization: Bearer <token>`. The valid tokens, their users, and roles are
 fixed:
 
-| token        | user      | role   |
-| ------------ | --------- | ------ |
-| `tok-admin`  | `admin`   | admin  |
-| `tok-editor` | `editor`  | editor |
-| `tok-editor2`| `editor2` | editor |
-| `tok-viewer` | `viewer`  | viewer |
+| token         | user      | role   |
+| ------------- | --------- | ------ |
+| `tok-admin`   | `admin`   | admin  |
+| `tok-editor`  | `editor`  | editor |
+| `tok-editor2` | `editor2` | editor |
+| `tok-viewer`  | `viewer`  | viewer |
 
 - If the `Authorization` header is missing, malformed, or names an unknown
   token, respond `401` with `{ "error": "unauthorized" }`.

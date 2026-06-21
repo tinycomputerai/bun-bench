@@ -1,8 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 function auth(token: string): Record<string, string> {
-  return { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  return {
+    authorization: `Bearer ${token}`,
+    "content-type": "application/json",
+  };
 }
 
 describe("scoped-tokens file api", () => {
@@ -17,7 +20,9 @@ describe("scoped-tokens file api", () => {
   });
 
   test("a read-only token can list files", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/files`, {
       headers: { authorization: "Bearer tok-ro" },
     });
@@ -27,7 +32,9 @@ describe("scoped-tokens file api", () => {
   });
 
   test("a write token can create a file", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/files`, {
       method: "POST",
       headers: auth("tok-rw"),
@@ -40,7 +47,9 @@ describe("scoped-tokens file api", () => {
   });
 
   test("missing token returns 401 unauthorized", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/files`);
     expect(response.status).toBe(401);
     expect((await response.json()).error).toBe("unauthorized");

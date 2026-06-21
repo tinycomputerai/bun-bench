@@ -9,11 +9,11 @@ Every request authenticates with a bearer token in the `Authorization` header:
 `Authorization: Bearer <token>`. The valid tokens and the scopes they grant are
 fixed:
 
-| token       | scopes                                        |
-| ----------- | --------------------------------------------- |
-| `tok-ro`    | `files:read`                                  |
-| `tok-rw`    | `files:read`, `files:write`                   |
-| `tok-admin` | `files:read`, `files:write`, `files:delete`   |
+| token       | scopes                                      |
+| ----------- | ------------------------------------------- |
+| `tok-ro`    | `files:read`                                |
+| `tok-rw`    | `files:read`, `files:write`                 |
+| `tok-admin` | `files:read`, `files:write`, `files:delete` |
 
 - If the `Authorization` header is missing, malformed, or names an unknown
   token, respond `401` with `{ "error": "unauthorized" }`.

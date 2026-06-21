@@ -10,20 +10,30 @@ import { randomUUID } from "node:crypto";
 const port = Number(Bun.env.PORT ?? 3000);
 
 type StepName = "reserve_flight" | "reserve_hotel" | "charge_card";
-type StepStatus = "pending" | "completed" | "failed" | "compensated" | "compensation_failed";
+type StepStatus =
+  | "pending"
+  | "completed"
+  | "failed"
+  | "compensated"
+  | "compensation_failed";
 
-type StepRecord = {
+interface StepRecord {
+  attempts: number;
   name: StepName;
   status: StepStatus;
-  attempts: number;
-};
+}
 
-type Saga = {
-  id: string;
-  state: "running" | "completed" | "compensating" | "failed" | "compensation_failed";
-  steps: StepRecord[];
+interface Saga {
   fail_at?: StepName;
-};
+  id: string;
+  state:
+    | "running"
+    | "completed"
+    | "compensating"
+    | "failed"
+    | "compensation_failed";
+  steps: StepRecord[];
+}
 
 const sagas = new Map<string, Saga>();
 const flightReservations = new Set<string>();
@@ -31,6 +41,8 @@ const hotelReservations = new Set<string>();
 const charges = new Set<string>();
 
 const ORDER: StepName[] = ["reserve_flight", "reserve_hotel", "charge_card"];
+
+const SAGA_PATH = /^\/sagas\/([^/]+)$/;
 
 function newSaga(failAt?: StepName): Saga {
   return {
@@ -42,32 +54,52 @@ function newSaga(failAt?: StepName): Saga {
 }
 
 function stepOf(saga: Saga, name: StepName): StepRecord {
-  return saga.steps.find((s) => s.name === name)!;
+  const found = saga.steps.find((s) => s.name === name);
+  if (!found) {
+    throw new Error(`unknown step: ${name}`);
+  }
+  return found;
 }
 
-async function forwardStep(saga: Saga, name: StepName): Promise<boolean> {
+function forwardStep(saga: Saga, name: StepName): boolean {
   const step = stepOf(saga, name);
-  if (step.status === "completed") return true;
+  if (step.status === "completed") {
+    return true;
+  }
   step.attempts += 1;
   if (saga.fail_at === name) {
     step.status = "failed";
     return false;
   }
-  if (name === "reserve_flight") flightReservations.add(saga.id);
-  if (name === "reserve_hotel") hotelReservations.add(saga.id);
-  if (name === "charge_card") charges.add(saga.id);
+  if (name === "reserve_flight") {
+    flightReservations.add(saga.id);
+  }
+  if (name === "reserve_hotel") {
+    hotelReservations.add(saga.id);
+  }
+  if (name === "charge_card") {
+    charges.add(saga.id);
+  }
   step.status = "completed";
   return true;
 }
 
-async function compensateStep(saga: Saga, name: StepName): Promise<boolean> {
+function compensateStep(saga: Saga, name: StepName): boolean {
   const step = stepOf(saga, name);
-  if (step.status !== "completed") return true;
+  if (step.status !== "completed") {
+    return true;
+  }
   step.attempts += 1;
-  if (name === "charge_card") charges.delete(saga.id);
-  if (name === "reserve_hotel") hotelReservations.delete(saga.id);
-  if (name === "reserve_flight") flightReservations.delete(saga.id);
-  if (saga.fail_at === `compensate_${name}` as StepName) {
+  if (name === "charge_card") {
+    charges.delete(saga.id);
+  }
+  if (name === "reserve_hotel") {
+    hotelReservations.delete(saga.id);
+  }
+  if (name === "reserve_flight") {
+    flightReservations.delete(saga.id);
+  }
+  if (saga.fail_at === (`compensate_${name}` as StepName)) {
     step.status = "compensation_failed";
     return false;
   }
@@ -82,7 +114,9 @@ async function runSaga(saga: Saga): Promise<void> {
       saga.state = "compensating";
       for (const reverse of [...ORDER].reverse()) {
         const step = stepOf(saga, reverse);
-        if (step.status !== "completed") continue;
+        if (step.status !== "completed") {
+          continue;
+        }
         const compensated = await compensateStep(saga, reverse);
         if (!compensated) {
           saga.state = "compensation_failed";
@@ -108,17 +142,25 @@ Bun.serve({
     if (request.method === "POST" && url.pathname === "/book-trip") {
       const body = await request.json().catch(() => null);
       const record = body as Record<string, unknown> | null;
-      const failAt = typeof record?.fail_at === "string" ? (record.fail_at as StepName) : undefined;
+      const failAt =
+        typeof record?.fail_at === "string"
+          ? (record.fail_at as StepName)
+          : undefined;
       const saga = newSaga(failAt);
       sagas.set(saga.id, saga);
       await runSaga(saga);
-      return Response.json({ saga_id: saga.id, state: saga.state }, { status: saga.state === "completed" ? 200 : 409 });
+      return Response.json(
+        { saga_id: saga.id, state: saga.state },
+        { status: saga.state === "completed" ? 200 : 409 }
+      );
     }
 
-    const sagaMatch = /^\/sagas\/([^/]+)$/.exec(url.pathname);
-    if (request.method === "GET" && sagaMatch) {
-      const saga = sagas.get(decodeURIComponent(sagaMatch[1]!));
-      if (!saga) return Response.json({ error: "not_found" }, { status: 404 });
+    const sagaMatch = SAGA_PATH.exec(url.pathname);
+    if (request.method === "GET" && sagaMatch?.[1] !== undefined) {
+      const saga = sagas.get(decodeURIComponent(sagaMatch[1]));
+      if (!saga) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
       return Response.json(
         {
           id: saga.id,
@@ -130,7 +172,7 @@ Bun.serve({
             charge: charges.has(saga.id),
           },
         },
-        { status: 200 },
+        { status: 200 }
       );
     }
 

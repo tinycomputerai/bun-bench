@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
+
+const ETAG_QUOTED = /^"/;
 
 describe("conditional cache public", () => {
   let server: RunningServer | undefined;
@@ -14,18 +16,26 @@ describe("conditional cache public", () => {
   });
 
   test("GET /resource returns validators and body", async () => {
-    if (!server) throw new Error("server did not start");
-    const response = await fetch(`${server.baseUrl}/resource`, { headers: identityHeaders });
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const response = await fetch(`${server.baseUrl}/resource`, {
+      headers: identityHeaders,
+    });
     expect(response.status).toBe(200);
-    expect(response.headers.get("etag")).toMatch(/^"/);
+    expect(response.headers.get("etag")).toMatch(ETAG_QUOTED);
     expect(response.headers.get("last-modified")).toBeTruthy();
     expect(response.headers.get("vary")).toBe("Accept-Encoding");
     expect(await response.text()).toBe("hello");
   });
 
   test("If-None-Match match returns 304 without body", async () => {
-    if (!server) throw new Error("server did not start");
-    const first = await fetch(`${server.baseUrl}/resource`, { headers: identityHeaders });
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const first = await fetch(`${server.baseUrl}/resource`, {
+      headers: identityHeaders,
+    });
     const etag = first.headers.get("etag");
     const second = await fetch(`${server.baseUrl}/resource`, {
       headers: { ...identityHeaders, "if-none-match": etag ?? "" },
@@ -35,12 +45,16 @@ describe("conditional cache public", () => {
   });
 
   test("gzip and identity variants differ", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const identity = await (
       await fetch(`${server.baseUrl}/resource`, { headers: identityHeaders })
     ).text();
     const gzip = await (
-      await fetch(`${server.baseUrl}/resource`, { headers: { "accept-encoding": "gzip" } })
+      await fetch(`${server.baseUrl}/resource`, {
+        headers: { "accept-encoding": "gzip" },
+      })
     ).text();
     expect(gzip).toStartWith("gzip:");
     expect(identity).not.toStartWith("gzip:");

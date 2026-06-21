@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 async function createItem(baseUrl: string, label: string): Promise<number> {
   const response = await fetch(`${baseUrl}/items`, {
@@ -28,7 +28,9 @@ describe("bidirectional pagination edge cases", () => {
   });
 
   test("has_prev is false on the first forward page", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await createItem(server.baseUrl, "seed-a");
     await createItem(server.baseUrl, "seed-b");
     const first = await get(server.baseUrl, "?limit=2");
@@ -39,25 +41,36 @@ describe("bidirectional pagination edge cases", () => {
   });
 
   test("has_next is false on the last forward page", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // Walk forward to the very end of the current list.
     let cursor: string | undefined;
     let last: any;
     let guard = 0;
     for (;;) {
-      const q = cursor === undefined ? "?limit=5" : `?limit=5&after=${encodeURIComponent(cursor)}`;
+      const q =
+        cursor === undefined
+          ? "?limit=5"
+          : `?limit=5&after=${encodeURIComponent(cursor)}`;
       const page = await get(server.baseUrl, q);
       expect(page.status).toBe(200);
       last = page.body;
-      if (!page.body.page_info.has_next) break;
+      if (!page.body.page_info.has_next) {
+        break;
+      }
       cursor = page.body.page_info.end_cursor;
-      if (++guard > 10000) throw new Error("pagination did not terminate");
+      if (++guard > 10_000) {
+        throw new Error("pagination did not terminate");
+      }
     }
     expect(last.page_info.has_next).toBe(false);
   });
 
   test("before cursor returns the correct slice in ascending order", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const ids: number[] = [];
     for (let i = 0; i < 8; i += 1) {
       ids.push(await createItem(server.baseUrl, `before-${i}`));
@@ -66,7 +79,10 @@ describe("bidirectional pagination edge cases", () => {
     // items immediately below it (ids[4], ids[5], ids[6]) in ascending order.
     const cursorId = ids[7]!;
     const cursor = Buffer.from(String(cursorId), "utf8").toString("base64url");
-    const page = await get(server.baseUrl, `?limit=3&before=${encodeURIComponent(cursor)}`);
+    const page = await get(
+      server.baseUrl,
+      `?limit=3&before=${encodeURIComponent(cursor)}`
+    );
     expect(page.status).toBe(200);
     const returned = page.body.items.map((it: any) => it.id);
     expect(returned).toEqual([ids[4], ids[5], ids[6]]);
@@ -79,19 +95,23 @@ describe("bidirectional pagination edge cases", () => {
   });
 
   test("passing both after and before returns 400 invalid_cursor_combination", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const id = await createItem(server.baseUrl, "combo");
     const cursor = Buffer.from(String(id), "utf8").toString("base64url");
     const page = await get(
       server.baseUrl,
-      `?after=${encodeURIComponent(cursor)}&before=${encodeURIComponent(cursor)}`,
+      `?after=${encodeURIComponent(cursor)}&before=${encodeURIComponent(cursor)}`
     );
     expect(page.status).toBe(400);
     expect(page.body.error).toBe("invalid_cursor_combination");
   });
 
   test("a garbage or forged cursor returns 400 invalid_cursor", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const garbage = await get(server.baseUrl, "?after=!!!notbase64!!!");
     expect(garbage.status).toBe(400);
     expect(garbage.body.error).toBe("invalid_cursor");
@@ -103,7 +123,9 @@ describe("bidirectional pagination edge cases", () => {
   });
 
   test("limit validation and clamping", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const zero = await get(server.baseUrl, "?limit=0");
     expect(zero.status).toBe(400);
     expect(zero.body.error).toBe("invalid_limit");
@@ -124,7 +146,9 @@ describe("bidirectional pagination edge cases", () => {
   });
 
   test("has_next is correct exactly at a boundary (no off-by-one)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // Create a fresh contiguous batch and anchor paging on it via an `after`
     // cursor equal to the id just below the batch, so the batch is returned in
     // a controlled window.
@@ -134,18 +158,29 @@ describe("bidirectional pagination edge cases", () => {
     }
     // Page that ends exactly on the second-to-last created id: has_next must be
     // true because at least ids[3] (and possibly newer) exist above it.
-    const afterFirst = Buffer.from(String(ids[0]!), "utf8").toString("base64url");
-    const midPage = await get(server.baseUrl, `?limit=2&after=${encodeURIComponent(afterFirst)}`);
+    const afterFirst = Buffer.from(String(ids[0]!), "utf8").toString(
+      "base64url"
+    );
+    const midPage = await get(
+      server.baseUrl,
+      `?limit=2&after=${encodeURIComponent(afterFirst)}`
+    );
     expect(midPage.status).toBe(200);
     // items should be ids[1], ids[2]; end_cursor encodes ids[2]; ids[3] exists above.
-    expect(midPage.body.items.map((it: any) => it.id)).toEqual([ids[1], ids[2]]);
+    expect(midPage.body.items.map((it: any) => it.id)).toEqual([
+      ids[1],
+      ids[2],
+    ]);
     expect(midPage.body.page_info.has_next).toBe(true);
 
     // Page that ends exactly on the last created id with nothing newer added:
     // request the slice after ids[2]; we get ids[3] only (limit 5). has_next
     // must be false because ids[3] is currently the maximum id.
     const afterMid = Buffer.from(String(ids[2]!), "utf8").toString("base64url");
-    const tailPage = await get(server.baseUrl, `?limit=5&after=${encodeURIComponent(afterMid)}`);
+    const tailPage = await get(
+      server.baseUrl,
+      `?limit=5&after=${encodeURIComponent(afterMid)}`
+    );
     expect(tailPage.status).toBe(200);
     expect(tailPage.body.items.map((it: any) => it.id)).toEqual([ids[3]]);
     expect(tailPage.body.page_info.has_next).toBe(false);

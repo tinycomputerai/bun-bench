@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 import { getResource, postWebhook } from "../helpers/webhook";
-import { startTaskServer, type RunningServer } from "../helpers/server";
 
 describe("exactly-once webhook public", () => {
   let server: RunningServer | undefined;
@@ -14,7 +14,9 @@ describe("exactly-once webhook public", () => {
   });
 
   test("signed increment applies once", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const resource = "pub-res-1";
     const response = await postWebhook(server.baseUrl, {
       event_id: "evt-pub-1",
@@ -30,7 +32,9 @@ describe("exactly-once webhook public", () => {
   });
 
   test("duplicate event_id acks without double apply", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const resource = "pub-res-2";
     const event = {
       event_id: "evt-pub-dup",
@@ -46,7 +50,9 @@ describe("exactly-once webhook public", () => {
   });
 
   test("out-of-order delivery applies in sequence order", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const resource = "pub-res-3";
     await postWebhook(server.baseUrl, {
       event_id: "evt-pub-3b",
@@ -68,7 +74,9 @@ describe("exactly-once webhook public", () => {
   });
 
   test("invalid signature is rejected", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const body = JSON.stringify({
       event_id: "evt-pub-bad",
       type: "set",
@@ -78,7 +86,10 @@ describe("exactly-once webhook public", () => {
     });
     const response = await fetch(`${server.baseUrl}/webhook`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-signature": "sha256=deadbeef" },
+      headers: {
+        "content-type": "application/json",
+        "x-signature": "sha256=deadbeef",
+      },
       body,
     });
     expect(response.status).toBe(401);

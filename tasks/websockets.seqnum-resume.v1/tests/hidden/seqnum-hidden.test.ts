@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let server: RunningServer | undefined;
 const sockets: WebSocket[] = [];
@@ -9,28 +9,33 @@ function wsUrl(base: string, channel: string, lastSeq?: number): string {
   return `${base.replace("http", "ws")}/ws?channel=${encodeURIComponent(channel)}${q}`;
 }
 
-type Recorder = {
-  ws: WebSocket;
+interface Recorder {
   next: (predicate: (m: any) => boolean, ms?: number) => Promise<any>;
   settle: (ms?: number) => Promise<void>;
   snapshot: () => any[];
-};
+  ws: WebSocket;
+}
 
 function connect(url: string): Promise<Recorder> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
     sockets.push(ws);
     const buffer: any[] = [];
-    let waiter: { predicate: (m: any) => boolean; resolve: (m: any) => void } | null = null;
+    let waiter: {
+      predicate: (m: any) => boolean;
+      resolve: (m: any) => void;
+    } | null = null;
 
     ws.addEventListener("message", (event: MessageEvent) => {
       let parsed: any;
       try {
-        parsed = JSON.parse(typeof event.data === "string" ? event.data : String(event.data));
+        parsed = JSON.parse(
+          typeof event.data === "string" ? event.data : String(event.data)
+        );
       } catch {
         return;
       }
-      if (waiter && waiter.predicate(parsed)) {
+      if (waiter?.predicate(parsed)) {
         const w = waiter;
         waiter = null;
         w.resolve(parsed);
@@ -39,7 +44,10 @@ function connect(url: string): Promise<Recorder> {
       buffer.push(parsed);
     });
 
-    const openTimer = setTimeout(() => reject(new Error("ws open timeout")), 4000);
+    const openTimer = setTimeout(
+      () => reject(new Error("ws open timeout")),
+      4000
+    );
     ws.addEventListener("open", () => {
       clearTimeout(openTimer);
       resolve({
@@ -81,7 +89,9 @@ function connect(url: string): Promise<Recorder> {
 
 function closed(ws: WebSocket): Promise<void> {
   return new Promise((resolve) => {
-    if (ws.readyState === WebSocket.CLOSED) return resolve();
+    if (ws.readyState === WebSocket.CLOSED) {
+      return resolve();
+    }
     ws.addEventListener("close", () => resolve());
     ws.close();
   });
@@ -118,16 +128,22 @@ describe("seqnum resume (hidden)", () => {
     for (const ws of sockets) {
       try {
         ws.close();
-      } catch {}
+      } catch {
+        /* ignore close errors during teardown */
+      }
     }
     await server?.stop();
   });
 
   test("live delivery: connected at last_seq=0 receives strictly increasing seq from 1", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const channel = cid("livestrict");
     const sub = await connect(wsUrl(server.baseUrl, channel, 0));
-    for (let i = 0; i < 4; i += 1) await publish(server.baseUrl, channel, { i });
+    for (let i = 0; i < 4; i += 1) {
+      await publish(server.baseUrl, channel, { i });
+    }
     const got = await take(sub, 4);
     expect(got.map((m) => m.seq)).toEqual([1, 2, 3, 4]);
     expect(got.map((m) => m.data.i)).toEqual([0, 1, 2, 3]);
@@ -135,7 +151,9 @@ describe("seqnum resume (hidden)", () => {
   });
 
   test("resume: reconnect with last_seq receives EXACTLY the missed messages, in order, no gaps or dupes", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const channel = cid("resume");
 
     // First subscriber receives seq 1 and 2, then disconnects.
@@ -144,7 +162,7 @@ describe("seqnum resume (hidden)", () => {
     await publish(server.baseUrl, channel, { v: 2 });
     const a = await take(first, 2);
     expect(a.map((m) => m.seq)).toEqual([1, 2]);
-    const lastReceived = a[a.length - 1].seq;
+    const lastReceived = a.at(-1).seq;
     await closed(first.ws);
 
     // Publish more while nobody (with this resume point) is connected.
@@ -168,7 +186,9 @@ describe("seqnum resume (hidden)", () => {
   });
 
   test("last_seq=0 on a channel with an existing buffer replays all of them in order", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const channel = cid("fullreplay");
     // Build a buffer with no subscriber connected.
     await publish(server.baseUrl, channel, { v: "x" });
@@ -183,7 +203,9 @@ describe("seqnum resume (hidden)", () => {
   });
 
   test("last_seq beyond the buffer replays nothing, then delivers live", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const channel = cid("beyond");
     await publish(server.baseUrl, channel, { v: 1 });
     await publish(server.baseUrl, channel, { v: 2 });
@@ -201,7 +223,9 @@ describe("seqnum resume (hidden)", () => {
   });
 
   test("channel isolation: a subscriber to channel A never receives channel B messages", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const chA = cid("isoA");
     const chB = cid("isoB");
 
@@ -211,7 +235,7 @@ describe("seqnum resume (hidden)", () => {
     await publish(server.baseUrl, chB, { from: "B" });
     await publish(server.baseUrl, chA, { from: "A" });
 
-    const a1 = await subA.next((m) => true);
+    const a1 = await subA.next((_m) => true);
     expect(a1).toEqual({ seq: 1, data: { from: "A" } });
 
     await subA.settle(500);
@@ -222,7 +246,9 @@ describe("seqnum resume (hidden)", () => {
   });
 
   test("per-channel sequencing is independent (each channel starts at 1)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const chA = cid("seqA");
     const chB = cid("seqB");
     const a = await publish(server.baseUrl, chA, {});
@@ -232,7 +258,9 @@ describe("seqnum resume (hidden)", () => {
   });
 
   test("connecting without a channel does not upgrade (400)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const res = await fetch(`${server.baseUrl}/ws`);
     expect(res.status).toBe(400);
   });

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("GET /limited", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("GET /limited", () => {
   });
 
   test("allows two requests from one client", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const headers = { "x-client-id": "client-public" };
     const first = await fetch(`${server.baseUrl}/limited`, { headers });

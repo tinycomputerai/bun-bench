@@ -7,7 +7,10 @@ mkdir -p /app/src
 cat > /app/src/server.ts <<'BUN_SERVER_BENCH_SOLUTION_EOF'
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Account = { id: string; balance: number };
+interface Account {
+  balance: number;
+  id: string;
+}
 
 const accounts = new Map<string, Account>();
 const locks = new Map<string, Promise<void>>();
@@ -16,7 +19,10 @@ for (const id of ["a", "b", "c", "d"]) {
   accounts.set(id, { id, balance: 1000 });
 }
 
-async function withOrderedLocks<T>(ids: string[], fn: () => T | Promise<T>): Promise<T> {
+async function withOrderedLocks<T>(
+  ids: string[],
+  fn: () => T | Promise<T>
+): Promise<T> {
   const unique = [...new Set(ids)].sort();
   const releases: Array<() => void> = [];
   for (const id of unique) {
@@ -25,7 +31,10 @@ async function withOrderedLocks<T>(ids: string[], fn: () => T | Promise<T>): Pro
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    locks.set(id, prev.then(() => gate));
+    locks.set(
+      id,
+      prev.then(() => gate)
+    );
     await prev;
     releases.push(release);
   }
@@ -50,7 +59,9 @@ Bun.serve({
     if (request.method === "GET" && url.pathname.startsWith("/accounts/")) {
       const id = url.pathname.slice("/accounts/".length);
       const account = accounts.get(id);
-      if (!account) return Response.json({ error: "not_found" }, { status: 404 });
+      if (!account) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
       return Response.json(account, { status: 200 });
     }
 
@@ -74,15 +85,23 @@ Bun.serve({
       }
       const fromAcct = accounts.get(from);
       const toAcct = accounts.get(to);
-      if (!fromAcct || !toAcct) return Response.json({ error: "not_found" }, { status: 404 });
+      if (!(fromAcct && toAcct)) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
 
       return withOrderedLocks([from, to], () => {
         if (fromAcct.balance < amount) {
-          return Response.json({ error: "insufficient_funds" }, { status: 409 });
+          return Response.json(
+            { error: "insufficient_funds" },
+            { status: 409 }
+          );
         }
         fromAcct.balance -= amount;
         toAcct.balance += amount;
-        return Response.json({ ok: true, from: fromAcct, to: toAcct }, { status: 200 });
+        return Response.json(
+          { ok: true, from: fromAcct, to: toAcct },
+          { status: 200 }
+        );
       });
     }
 

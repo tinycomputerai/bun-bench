@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { signJwt } from "../helpers/jwt";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
-async function mint(baseUrl: string, sub = "alice") {
+function mint(baseUrl: string, sub = "alice") {
   return fetch(`${baseUrl}/mint`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -10,22 +10,24 @@ async function mint(baseUrl: string, sub = "alice") {
   });
 }
 
-async function verify(baseUrl: string, token: string) {
+function verify(baseUrl: string, token: string) {
   return fetch(`${baseUrl}/verify`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}` },
   });
 }
 
-async function rotate(baseUrl: string) {
+function rotate(baseUrl: string) {
   return fetch(`${baseUrl}/keys/rotate`, { method: "POST" });
 }
 
-async function retire(baseUrl: string, kid: string) {
-  return fetch(`${baseUrl}/keys/${encodeURIComponent(kid)}/retire`, { method: "POST" });
+function retire(baseUrl: string, kid: string) {
+  return fetch(`${baseUrl}/keys/${encodeURIComponent(kid)}/retire`, {
+    method: "POST",
+  });
 }
 
-async function jwks(baseUrl: string) {
+function jwks(baseUrl: string) {
   return fetch(`${baseUrl}/.well-known/jwks`);
 }
 
@@ -41,7 +43,9 @@ describe("jwt key rotation public", () => {
   });
 
   test("minted token verifies and returns sub", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const token = (await (await mint(server.baseUrl)).json()).token;
     const response = await verify(server.baseUrl, token);
     expect(response.status).toBe(200);
@@ -49,7 +53,9 @@ describe("jwt key rotation public", () => {
   });
 
   test("jwks lists at least one key with kid and k", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const body = await (await jwks(server.baseUrl)).json();
     expect(Array.isArray(body.keys)).toBe(true);
     expect(body.keys.length).toBeGreaterThan(0);
@@ -58,7 +64,9 @@ describe("jwt key rotation public", () => {
   });
 
   test("after rotation the old key token still verifies until retired", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const beforeRotate = await jwks(server.baseUrl);
     const oldKeys = (await beforeRotate.json()).keys;
     const oldKid = oldKeys[0].kid;
@@ -77,10 +85,14 @@ describe("jwt key rotation public", () => {
   });
 
   test("new mint uses the rotated active kid", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { kid: newKid } = await (await rotate(server.baseUrl)).json();
     const token = (await (await mint(server.baseUrl)).json()).token;
-    const header = JSON.parse(Buffer.from(token.split(".")[0]!, "base64url").toString("utf8"));
+    const header = JSON.parse(
+      Buffer.from(token.split(".")[0]!, "base64url").toString("utf8")
+    );
     expect(header.kid).toBe(newKid);
   });
 });

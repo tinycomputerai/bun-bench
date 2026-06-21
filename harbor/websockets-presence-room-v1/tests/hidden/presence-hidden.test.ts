@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let server: RunningServer | undefined;
 const sockets: WebSocket[] = [];
@@ -11,28 +11,33 @@ function wsUrl(base: string, room: string, user: string): string {
 // A recorder buffers every message from the moment the socket opens, so no
 // message is ever dropped between awaits. `next` consumes from the buffer (or
 // waits with a timeout); `snapshot` returns currently-buffered messages.
-type Recorder = {
-  ws: WebSocket;
+interface Recorder {
   next: (predicate: (m: any) => boolean, ms?: number) => Promise<any>;
   settle: (ms?: number) => Promise<void>;
   snapshot: () => any[];
-};
+  ws: WebSocket;
+}
 
 function connect(url: string): Promise<Recorder> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
     sockets.push(ws);
     const buffer: any[] = [];
-    let waiter: { predicate: (m: any) => boolean; resolve: (m: any) => void } | null = null;
+    let waiter: {
+      predicate: (m: any) => boolean;
+      resolve: (m: any) => void;
+    } | null = null;
 
     ws.addEventListener("message", (event: MessageEvent) => {
       let parsed: any;
       try {
-        parsed = JSON.parse(typeof event.data === "string" ? event.data : String(event.data));
+        parsed = JSON.parse(
+          typeof event.data === "string" ? event.data : String(event.data)
+        );
       } catch {
         return;
       }
-      if (waiter && waiter.predicate(parsed)) {
+      if (waiter?.predicate(parsed)) {
         const w = waiter;
         waiter = null;
         w.resolve(parsed);
@@ -41,7 +46,10 @@ function connect(url: string): Promise<Recorder> {
       buffer.push(parsed);
     });
 
-    const openTimer = setTimeout(() => reject(new Error("ws open timeout")), 4000);
+    const openTimer = setTimeout(
+      () => reject(new Error("ws open timeout")),
+      4000
+    );
     ws.addEventListener("open", () => {
       clearTimeout(openTimer);
       resolve({
@@ -83,7 +91,9 @@ function connect(url: string): Promise<Recorder> {
 
 function closed(ws: WebSocket): Promise<void> {
   return new Promise((resolve) => {
-    if (ws.readyState === WebSocket.CLOSED) return resolve();
+    if (ws.readyState === WebSocket.CLOSED) {
+      return resolve();
+    }
     ws.addEventListener("close", () => resolve());
     ws.close();
   });
@@ -102,19 +112,25 @@ describe("presence room (hidden)", () => {
     for (const ws of sockets) {
       try {
         ws.close();
-      } catch {}
+      } catch {
+        /* ignore */
+      }
     }
     await server?.stop();
   });
 
   test("second join causes the first member to receive presence listing both users", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const room = rid("both");
     const a = await connect(wsUrl(server.baseUrl, room, "alice"));
     await a.next((m) => m.type === "presence");
 
     const b = await connect(wsUrl(server.baseUrl, room, "bob"));
-    const updated = await a.next((m) => m.type === "presence" && m.users.length === 2);
+    const updated = await a.next(
+      (m) => m.type === "presence" && m.users.length === 2
+    );
     expect(updated.room).toBe(room);
     expect(updated.users).toEqual(["alice", "bob"]);
 
@@ -126,7 +142,9 @@ describe("presence room (hidden)", () => {
   });
 
   test("chat reaches the other member of the same room but never the sender or a different room", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const roomX = rid("roomx");
     const roomY = rid("roomy");
 
@@ -140,7 +158,11 @@ describe("presence room (hidden)", () => {
     a.ws.send(JSON.stringify({ type: "chat", text: "hello room x" }));
 
     const received = await b.next((m) => m.type === "chat");
-    expect(received).toEqual({ type: "chat", user: "alice", text: "hello room x" });
+    expect(received).toEqual({
+      type: "chat",
+      user: "alice",
+      text: "hello room x",
+    });
 
     // Give any erroneous fan-out time to arrive, then assert it did not.
     await a.settle(600);
@@ -153,7 +175,9 @@ describe("presence room (hidden)", () => {
   });
 
   test("disconnect removes the user from presence and from GET /rooms/:room (no leak)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const room = rid("leave");
     const a = await connect(wsUrl(server.baseUrl, room, "alice"));
     await a.next((m) => m.type === "presence");
@@ -162,7 +186,8 @@ describe("presence room (hidden)", () => {
 
     await closed(b.ws);
     const after = await a.next(
-      (m) => m.type === "presence" && m.users.length === 1 && m.users[0] === "alice",
+      (m) =>
+        m.type === "presence" && m.users.length === 1 && m.users[0] === "alice"
     );
     expect(after.users).toEqual(["alice"]);
 
@@ -178,7 +203,9 @@ describe("presence room (hidden)", () => {
   });
 
   test("rooms are isolated: presence never crosses rooms", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const roomA = rid("isoa");
     const roomB = rid("isob");
 
@@ -190,10 +217,14 @@ describe("presence room (hidden)", () => {
 
     // alice must not have received any presence mentioning bob.
     await a.settle(600);
-    const sawBob = a.snapshot().some((m) => m.type === "presence" && m.users.includes("bob"));
+    const sawBob = a
+      .snapshot()
+      .some((m) => m.type === "presence" && m.users.includes("bob"));
     expect(sawBob).toBe(false);
 
-    const snapA = await (await fetch(`${server.baseUrl}/rooms/${roomA}`)).json();
+    const snapA = await (
+      await fetch(`${server.baseUrl}/rooms/${roomA}`)
+    ).json();
     expect(snapA.users).toEqual(["alice"]);
 
     await closed(a.ws);
@@ -201,7 +232,9 @@ describe("presence room (hidden)", () => {
   });
 
   test("connecting without room or user does not upgrade (400)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const res = await fetch(`${server.baseUrl}/ws`);
     expect(res.status).toBe(400);
   });

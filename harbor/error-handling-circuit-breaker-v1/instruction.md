@@ -20,8 +20,8 @@ The service contains a simulated downstream dependency. It has a **mode** and a
 - `"down"` — every invocation fails (throws / errors).
 - `"flaky"` — every invocation fails until the mode is changed. (Behaves like
   `"down"` while the mode is `"flaky"`; it is a distinct selectable mode.)
-- The **call counter** counts how many times the dependency was *actually
-  invoked*. It increments on every real invocation regardless of success or
+- The **call counter** counts how many times the dependency was _actually
+  invoked_. It increments on every real invocation regardless of success or
   failure. It is NOT incremented when the breaker is open and the service fails
   fast without touching the dependency.
 

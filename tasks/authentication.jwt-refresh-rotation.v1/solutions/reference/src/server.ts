@@ -1,4 +1,9 @@
-import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import {
+  createHmac,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 const secret = "bun-server-bench-secret";
@@ -7,6 +12,9 @@ const ACCESS_TTL_SECONDS = 300; // a few minutes
 const USERNAME = "alice";
 const PASSWORD = "password123";
 
+const BASE64URL_SEGMENT = /^[A-Za-z0-9_-]+$/;
+const BEARER_HEADER = /^Bearer (.+)$/;
+
 function b64url(input: string | Buffer): string {
   return Buffer.from(input).toString("base64url");
 }
@@ -14,50 +22,79 @@ function b64url(input: string | Buffer): string {
 function signAccessToken(sub: string): string {
   const header = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const now = Math.floor(Date.now() / 1000);
-  const payload = b64url(JSON.stringify({ sub, iat: now, exp: now + ACCESS_TTL_SECONDS }));
+  const payload = b64url(
+    JSON.stringify({ sub, iat: now, exp: now + ACCESS_TTL_SECONDS })
+  );
   const signingInput = `${header}.${payload}`;
-  const sig = createHmac("sha256", secret).update(signingInput).digest("base64url");
+  const sig = createHmac("sha256", secret)
+    .update(signingInput)
+    .digest("base64url");
   return `${signingInput}.${sig}`;
 }
 
 function constantTimeEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "utf8");
   const bufB = Buffer.from(b, "utf8");
-  if (bufA.length !== bufB.length) return false;
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
   return timingSafeEqual(bufA, bufB);
 }
 
 function verifyAccessToken(token: string): { sub: string } | null {
   const segments = token.split(".");
-  if (segments.length !== 3) return null;
+  if (segments.length !== 3) {
+    return null;
+  }
   const [headerSeg, payloadSeg, sigSeg] = segments;
-  if (!headerSeg || !payloadSeg) return null;
+  if (!(headerSeg && payloadSeg)) {
+    return null;
+  }
   let header: unknown;
   let payload: unknown;
   try {
-    if (!/^[A-Za-z0-9_-]+$/.test(headerSeg) || !/^[A-Za-z0-9_-]+$/.test(payloadSeg)) return null;
+    if (
+      !(BASE64URL_SEGMENT.test(headerSeg) && BASE64URL_SEGMENT.test(payloadSeg))
+    ) {
+      return null;
+    }
     header = JSON.parse(Buffer.from(headerSeg, "base64url").toString("utf8"));
     payload = JSON.parse(Buffer.from(payloadSeg, "base64url").toString("utf8"));
   } catch {
     return null;
   }
-  if (typeof header !== "object" || header === null) return null;
-  if ((header as Record<string, unknown>).alg !== "HS256") return null;
-  const expected = createHmac("sha256", secret).update(`${headerSeg}.${payloadSeg}`).digest("base64url");
-  if (!constantTimeEqual(sigSeg, expected)) return null;
+  if (typeof header !== "object" || header === null) {
+    return null;
+  }
+  if ((header as Record<string, unknown>).alg !== "HS256") {
+    return null;
+  }
+  const expected = createHmac("sha256", secret)
+    .update(`${headerSeg}.${payloadSeg}`)
+    .digest("base64url");
+  if (!constantTimeEqual(sigSeg, expected)) {
+    return null;
+  }
   const claims = payload as Record<string, unknown>;
-  if (typeof claims.exp === "number" && claims.exp <= Math.floor(Date.now() / 1000)) return null;
-  if (typeof claims.sub !== "string") return null;
+  if (
+    typeof claims.exp === "number" &&
+    claims.exp <= Math.floor(Date.now() / 1000)
+  ) {
+    return null;
+  }
+  if (typeof claims.sub !== "string") {
+    return null;
+  }
   return { sub: claims.sub };
 }
 
 // --- Refresh token families (in-memory) ---
 
-type Family = {
+interface Family {
+  currentToken: string; // the only valid refresh token right now
   id: string;
   revoked: boolean;
-  currentToken: string; // the only valid refresh token right now
-};
+}
 
 // Map every refresh token ever issued -> its family.
 const tokenToFamily = new Map<string, Family>();
@@ -68,7 +105,11 @@ function newRefreshToken(): string {
 }
 
 function issueFamily(): { refreshToken: string } {
-  const family: Family = { id: randomUUID(), revoked: false, currentToken: newRefreshToken() };
+  const family: Family = {
+    id: randomUUID(),
+    revoked: false,
+    currentToken: newRefreshToken(),
+  };
   families.set(family.id, family);
   tokenToFamily.set(family.currentToken, family);
   return { refreshToken: family.currentToken };
@@ -81,8 +122,12 @@ type RefreshOutcome =
 
 function rotate(presented: string): RefreshOutcome {
   const family = tokenToFamily.get(presented);
-  if (!family) return { kind: "invalid" };
-  if (family.revoked) return { kind: "invalid" };
+  if (!family) {
+    return { kind: "invalid" };
+  }
+  if (family.revoked) {
+    return { kind: "invalid" };
+  }
 
   // Reuse: a known token from this family that is NOT the current one.
   if (presented !== family.currentToken) {
@@ -98,17 +143,25 @@ function rotate(presented: string): RefreshOutcome {
 }
 
 function extractBearer(header: string | null): string | null {
-  if (!header) return null;
-  const match = /^Bearer (.+)$/.exec(header.trim());
-  if (!match) return null;
+  if (!header) {
+    return null;
+  }
+  const match = BEARER_HEADER.exec(header.trim());
+  if (!match) {
+    return null;
+  }
   const token = match[1].trim();
   return token.length > 0 ? token : null;
 }
 
-async function readJson(request: Request): Promise<Record<string, unknown> | null> {
+async function readJson(
+  request: Request
+): Promise<Record<string, unknown> | null> {
   try {
     const body = await request.json();
-    if (typeof body !== "object" || body === null) return null;
+    if (typeof body !== "object" || body === null) {
+      return null;
+    }
     return body as Record<string, unknown>;
   } catch {
     return null;
@@ -131,8 +184,11 @@ Bun.serve({
       }
       const { refreshToken } = issueFamily();
       return Response.json(
-        { access_token: signAccessToken(USERNAME), refresh_token: refreshToken },
-        { status: 200 },
+        {
+          access_token: signAccessToken(USERNAME),
+          refresh_token: refreshToken,
+        },
+        { status: 200 }
       );
     }
 
@@ -147,11 +203,17 @@ Bun.serve({
         return Response.json({ error: "invalid_refresh" }, { status: 401 });
       }
       if (outcome.kind === "reuse") {
-        return Response.json({ error: "token_reuse_detected" }, { status: 401 });
+        return Response.json(
+          { error: "token_reuse_detected" },
+          { status: 401 }
+        );
       }
       return Response.json(
-        { access_token: signAccessToken(USERNAME), refresh_token: outcome.refreshToken },
-        { status: 200 },
+        {
+          access_token: signAccessToken(USERNAME),
+          refresh_token: outcome.refreshToken,
+        },
+        { status: 200 }
       );
     }
 

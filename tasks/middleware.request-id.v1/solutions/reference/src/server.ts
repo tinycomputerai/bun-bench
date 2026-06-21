@@ -13,7 +13,7 @@ Bun.serve({
 
       return Response.json(
         { requestId },
-        { status: 200, headers: { "x-request-id": requestId } },
+        { status: 200, headers: { "x-request-id": requestId } }
       );
     }
 

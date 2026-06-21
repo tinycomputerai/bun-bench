@@ -71,9 +71,11 @@ async function main(): Promise<void> {
     for (const slug of removed) {
       console.log(`[harbor] removed stale export ${slug}`);
     }
+    // Regenerate dataset.toml before writing the lock — the lock checksum
+    // covers the whole harbor/ tree, including dataset.toml.
+    syncDataset(outRoot);
     const lockPath = writeTasksLock(resolve(process.cwd(), outRoot));
     console.log(`[harbor] wrote tasks lock to ${lockPath}`);
-    syncDataset(outRoot);
   }
 
   console.log(

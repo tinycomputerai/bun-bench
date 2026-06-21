@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
-async function createAccount(baseUrl: string, name: string, initial_balance?: number) {
+async function createAccount(
+  baseUrl: string,
+  name: string,
+  initial_balance?: number
+) {
   const body: Record<string, unknown> = { name };
-  if (initial_balance !== undefined) body.initial_balance = initial_balance;
+  if (initial_balance !== undefined) {
+    body.initial_balance = initial_balance;
+  }
   const response = await fetch(`${baseUrl}/accounts`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -24,7 +30,9 @@ describe("money ledger", () => {
   });
 
   test("creates an account at balance 0", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { response, account } = await createAccount(server.baseUrl, "alice");
     expect(response.status).toBe(201);
     expect(account.name).toBe("alice");
@@ -33,7 +41,9 @@ describe("money ledger", () => {
   });
 
   test("creates a funded account and reads it back", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { account } = await createAccount(server.baseUrl, "bank", 500);
     const read = await fetch(`${server.baseUrl}/accounts/${account.id}`);
     expect(read.status).toBe(200);
@@ -43,7 +53,9 @@ describe("money ledger", () => {
   });
 
   test("a transfer moves money between accounts", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { account: from } = await createAccount(server.baseUrl, "src", 100);
     const { account: to } = await createAccount(server.baseUrl, "dst", 0);
 
@@ -56,14 +68,20 @@ describe("money ledger", () => {
     const result = await transfer.json();
     expect(result).toEqual({ from: from.id, to: to.id, amount: 40 });
 
-    const fromAfter = await (await fetch(`${server.baseUrl}/accounts/${from.id}`)).json();
-    const toAfter = await (await fetch(`${server.baseUrl}/accounts/${to.id}`)).json();
+    const fromAfter = await (
+      await fetch(`${server.baseUrl}/accounts/${from.id}`)
+    ).json();
+    const toAfter = await (
+      await fetch(`${server.baseUrl}/accounts/${to.id}`)
+    ).json();
     expect(fromAfter.balance).toBe(60);
     expect(toAfter.balance).toBe(40);
   });
 
   test("unknown account returns 404", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/accounts/0`);
     expect(response.status).toBe(404);
   });

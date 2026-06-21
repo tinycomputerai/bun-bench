@@ -15,11 +15,11 @@ scopes, and resource policy — never the deputy's ambient privileges alone.
 
 Bearer tokens (fixed for this task):
 
-| Token | User | Scopes |
-|-------|------|--------|
-| `tok-admin` | admin | read, write, admin |
-| `tok-editor` | editor | read, write |
-| `tok-viewer` | viewer | read |
+| Token        | User   | Scopes             |
+| ------------ | ------ | ------------------ |
+| `tok-admin`  | admin  | read, write, admin |
+| `tok-editor` | editor | read, write        |
+| `tok-viewer` | viewer | read               |
 
 Pre-seeded resource `res-1` is owned by **editor**.
 

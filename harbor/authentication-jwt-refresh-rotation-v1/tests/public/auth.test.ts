@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
-async function login(baseUrl: string, username = "alice", password = "password123") {
+function login(baseUrl: string, username = "alice", password = "password123") {
   return fetch(`${baseUrl}/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -9,7 +9,7 @@ async function login(baseUrl: string, username = "alice", password = "password12
   });
 }
 
-async function refresh(baseUrl: string, token: string) {
+function refresh(baseUrl: string, token: string) {
   return fetch(`${baseUrl}/refresh`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -29,7 +29,9 @@ describe("jwt refresh rotation", () => {
   });
 
   test("login returns an access and refresh token pair", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await login(server.baseUrl);
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -38,7 +40,9 @@ describe("jwt refresh rotation", () => {
   });
 
   test("the access token from login authorizes GET /protected", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const { access_token } = await (await login(server.baseUrl)).json();
     const response = await fetch(`${server.baseUrl}/protected`, {
       headers: { authorization: `Bearer ${access_token}` },
@@ -48,7 +52,9 @@ describe("jwt refresh rotation", () => {
   });
 
   test("refresh issues a new working pair", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const first = await (await login(server.baseUrl)).json();
     const response = await refresh(server.baseUrl, first.refresh_token);
     expect(response.status).toBe(200);
@@ -63,7 +69,9 @@ describe("jwt refresh rotation", () => {
   });
 
   test("wrong credentials are rejected", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await login(server.baseUrl, "alice", "wrong");
     expect(response.status).toBe(401);
     expect((await response.json()).error).toBe("invalid_credentials");

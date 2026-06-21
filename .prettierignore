@@ -11,8 +11,6 @@ results
 jobs
 datasets
 
-# Benchmark content (agent-visible) and generated Harbor projection — never
-# reformat: it would change task source and invalidate committed exports.
-tasks
+# Generated Harbor projection — produced by the export adapter, not hand-edited.
 harbor
 .chunks

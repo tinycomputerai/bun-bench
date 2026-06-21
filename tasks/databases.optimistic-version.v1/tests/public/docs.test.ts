@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("optimistic-version document store", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("optimistic-version document store", () => {
   });
 
   test("creates a document at version 1", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/docs`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -28,7 +30,9 @@ describe("optimistic-version document store", () => {
   });
 
   test("reads a document and bumps version on a matching update", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await (
       await fetch(`${server.baseUrl}/docs`, {
         method: "POST",
@@ -39,7 +43,10 @@ describe("optimistic-version document store", () => {
 
     const updated = await fetch(`${server.baseUrl}/docs/${created.id}`, {
       method: "PUT",
-      headers: { "content-type": "application/json", "if-match": String(created.version) },
+      headers: {
+        "content-type": "application/json",
+        "if-match": String(created.version),
+      },
       body: JSON.stringify({ body: "v2" }),
     });
     expect(updated.status).toBe(200);
@@ -50,7 +57,9 @@ describe("optimistic-version document store", () => {
   });
 
   test("rejects an update whose If-Match version is stale", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await (
       await fetch(`${server.baseUrl}/docs`, {
         method: "POST",

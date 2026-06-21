@@ -2,8 +2,16 @@ import { randomUUID } from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Payment = { id: string; amount: number; currency: string; status: "captured" };
-type StoredResponse = { fingerprint: string; payment: Payment };
+interface Payment {
+  amount: number;
+  currency: string;
+  id: string;
+  status: "captured";
+}
+interface StoredResponse {
+  fingerprint: string;
+  payment: Payment;
+}
 
 const payments = new Map<string, Payment>();
 // Per-key record of the first completed capture.
@@ -32,7 +40,10 @@ Bun.serve({
     if (request.method === "POST" && url.pathname === "/payments") {
       const key = request.headers.get("idempotency-key");
       if (key === null || key.trim() === "") {
-        return Response.json({ error: "missing_idempotency_key" }, { status: 400 });
+        return Response.json(
+          { error: "missing_idempotency_key" },
+          { status: 400 }
+        );
       }
 
       let body: unknown;
@@ -59,7 +70,10 @@ Bun.serve({
       const existing = byKey.get(key);
       if (existing) {
         if (existing.fingerprint !== fp) {
-          return Response.json({ error: "idempotency_key_reuse" }, { status: 409 });
+          return Response.json(
+            { error: "idempotency_key_reuse" },
+            { status: 409 }
+          );
         }
         return Response.json(paymentBody(existing.payment), {
           status: 201,
@@ -74,7 +88,7 @@ Bun.serve({
       let pending = inFlight.get(key);
       if (!pending) {
         isCreator = true;
-        pending = (async () => {
+        pending = (() => {
           const payment: Payment = {
             id: randomUUID(),
             amount,
@@ -84,27 +98,41 @@ Bun.serve({
           payments.set(payment.id, payment);
           const stored: StoredResponse = { fingerprint: fp, payment };
           byKey.set(key, stored);
-          return stored;
+          return Promise.resolve(stored);
         })();
         inFlight.set(key, pending);
         pending.finally(() => {
-          if (inFlight.get(key) === pending) inFlight.delete(key);
+          if (inFlight.get(key) === pending) {
+            inFlight.delete(key);
+          }
         });
       }
 
       const stored = await pending;
       if (stored.fingerprint !== fp) {
         // The winning request for this key used a different body.
-        return Response.json({ error: "idempotency_key_reuse" }, { status: 409 });
+        return Response.json(
+          { error: "idempotency_key_reuse" },
+          { status: 409 }
+        );
       }
       // The creator returns a fresh 201; everyone who joined is a replay.
       const headers = isCreator ? {} : { "Idempotency-Replayed": "true" };
-      return Response.json(paymentBody(stored.payment), { status: 201, headers });
+      return Response.json(paymentBody(stored.payment), {
+        status: 201,
+        headers,
+      });
     }
 
-    if (segments.length === 2 && segments[0] === "payments" && request.method === "GET") {
+    if (
+      segments.length === 2 &&
+      segments[0] === "payments" &&
+      request.method === "GET"
+    ) {
       const payment = payments.get(segments[1]);
-      if (!payment) return Response.json({ error: "not_found" }, { status: 404 });
+      if (!payment) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
       return Response.json(paymentBody(payment), { status: 200 });
     }
 

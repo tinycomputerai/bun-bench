@@ -25,7 +25,16 @@ db.exec(`CREATE TABLE IF NOT EXISTS docs (
   version INTEGER NOT NULL DEFAULT 1
 );`);
 
-type Doc = { id: number; title: string; body: string; version: number };
+const WEAK_PREFIX_RE = /^W\//;
+const QUOTED_RE = /^"(.*)"$/;
+const DIGITS_RE = /^\d+$/;
+
+interface Doc {
+  body: string;
+  id: number;
+  title: string;
+  version: number;
+}
 
 type IfMatch =
   | { kind: "missing" }
@@ -33,9 +42,16 @@ type IfMatch =
   | { kind: "value"; value: number };
 
 function parseIfMatch(header: string | null): IfMatch {
-  if (header === null) return { kind: "missing" };
-  const stripped = header.trim().replace(/^W\//, "").replace(/^"(.*)"$/, "$1");
-  if (!/^\d+$/.test(stripped)) return { kind: "invalid" };
+  if (header === null) {
+    return { kind: "missing" };
+  }
+  const stripped = header
+    .trim()
+    .replace(WEAK_PREFIX_RE, "")
+    .replace(QUOTED_RE, "$1");
+  if (!DIGITS_RE.test(stripped)) {
+    return { kind: "invalid" };
+  }
   return { kind: "value", value: Number(stripped) };
 }
 
@@ -57,14 +73,21 @@ Bun.serve({
         return Response.json({ error: "invalid_json" }, { status: 400 });
       }
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.title !== "string" || typeof record.body !== "string") {
+      if (
+        !record ||
+        typeof record.title !== "string" ||
+        typeof record.body !== "string"
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const created = db
         .query<Doc, [string, string]>(
-          "INSERT INTO docs (title, body, version) VALUES (?, ?, 1) RETURNING id, title, body, version",
+          "INSERT INTO docs (title, body, version) VALUES (?, ?, 1) RETURNING id, title, body, version"
         )
-        .get(record.title, record.body)!;
+        .get(record.title, record.body);
+      if (created === null) {
+        throw new Error("insert did not return a row");
+      }
       return withEtag(created, 201);
     }
 
@@ -76,16 +99,23 @@ Bun.serve({
 
       if (request.method === "GET") {
         const doc = db
-          .query<Doc, [number]>("SELECT id, title, body, version FROM docs WHERE id = ?")
+          .query<Doc, [number]>(
+            "SELECT id, title, body, version FROM docs WHERE id = ?"
+          )
           .get(id);
-        if (!doc) return Response.json({ error: "not_found" }, { status: 404 });
+        if (!doc) {
+          return Response.json({ error: "not_found" }, { status: 404 });
+        }
         return withEtag(doc, 200);
       }
 
       if (request.method === "PUT") {
         const ifMatch = parseIfMatch(request.headers.get("if-match"));
         if (ifMatch.kind === "missing") {
-          return Response.json({ error: "precondition_required" }, { status: 428 });
+          return Response.json(
+            { error: "precondition_required" },
+            { status: 428 }
+          );
         }
         if (ifMatch.kind === "invalid") {
           return Response.json({ error: "invalid_if_match" }, { status: 400 });
@@ -100,34 +130,51 @@ Bun.serve({
 
         const apply = db.transaction(() => {
           const current = db
-            .query<Doc, [number]>("SELECT id, title, body, version FROM docs WHERE id = ?")
+            .query<Doc, [number]>(
+              "SELECT id, title, body, version FROM docs WHERE id = ?"
+            )
             .get(id);
-          if (!current) return { status: 404, data: { error: "not_found" } as const };
+          if (!current) {
+            return { status: 404, data: { error: "not_found" } as const };
+          }
           if (current.version !== ifMatch.value) {
             return {
               status: 409,
-              data: { error: "version_conflict", current_version: current.version } as const,
+              data: {
+                error: "version_conflict",
+                current_version: current.version,
+              } as const,
             };
           }
-          const nextTitle = typeof patch?.title === "string" ? patch.title : current.title;
-          const nextBody = typeof patch?.body === "string" ? patch.body : current.body;
+          const nextTitle =
+            typeof patch?.title === "string" ? patch.title : current.title;
+          const nextBody =
+            typeof patch?.body === "string" ? patch.body : current.body;
           const updated = db
             .query<Doc, [string, string, number]>(
-              "UPDATE docs SET title = ?, body = ?, version = version + 1 WHERE id = ? RETURNING id, title, body, version",
+              "UPDATE docs SET title = ?, body = ?, version = version + 1 WHERE id = ? RETURNING id, title, body, version"
             )
-            .get(nextTitle, nextBody, id)!;
+            .get(nextTitle, nextBody, id);
+          if (updated === null) {
+            throw new Error("update did not return a row");
+          }
           return { status: 200, data: updated };
         });
 
         const result = apply();
-        if (result.status === 200) return withEtag(result.data as Doc, 200);
+        if (result.status === 200) {
+          return withEtag(result.data as Doc, 200);
+        }
         return Response.json(result.data, { status: result.status });
       }
 
       if (request.method === "DELETE") {
         const ifMatch = parseIfMatch(request.headers.get("if-match"));
         if (ifMatch.kind === "missing") {
-          return Response.json({ error: "precondition_required" }, { status: 428 });
+          return Response.json(
+            { error: "precondition_required" },
+            { status: 428 }
+          );
         }
         if (ifMatch.kind === "invalid") {
           return Response.json({ error: "invalid_if_match" }, { status: 400 });
@@ -135,13 +182,20 @@ Bun.serve({
 
         const apply = db.transaction(() => {
           const current = db
-            .query<Doc, [number]>("SELECT id, title, body, version FROM docs WHERE id = ?")
+            .query<Doc, [number]>(
+              "SELECT id, title, body, version FROM docs WHERE id = ?"
+            )
             .get(id);
-          if (!current) return { status: 404, data: { error: "not_found" } as const };
+          if (!current) {
+            return { status: 404, data: { error: "not_found" } as const };
+          }
           if (current.version !== ifMatch.value) {
             return {
               status: 409,
-              data: { error: "version_conflict", current_version: current.version } as const,
+              data: {
+                error: "version_conflict",
+                current_version: current.version,
+              } as const,
             };
           }
           db.query("DELETE FROM docs WHERE id = ?").run(id);
@@ -149,7 +203,9 @@ Bun.serve({
         });
 
         const result = apply();
-        if (result.status === 204) return new Response(null, { status: 204 });
+        if (result.status === 204) {
+          return new Response(null, { status: 204 });
+        }
         return Response.json(result.data, { status: result.status });
       }
 

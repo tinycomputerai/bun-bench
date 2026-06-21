@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("safe error edge cases", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("safe error edge cases", () => {
   });
 
   test("does not expose stack traces", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/boom`);
     const text = await response.text();
@@ -24,7 +26,9 @@ describe("safe error edge cases", () => {
   });
 
   test("returns JSON for unknown routes", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/missing`);
 

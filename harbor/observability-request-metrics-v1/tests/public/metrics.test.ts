@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 function counterValue(
   text: string,
   method: string,
   route: string,
-  status: string,
+  status: string
 ): number | undefined {
   const needle = `http_requests_total{method="${method}",route="${route}",status="${status}"}`;
   for (const line of text.split("\n")) {
@@ -14,7 +14,7 @@ function counterValue(
       return Number(rest);
     }
   }
-  return undefined;
+  return;
 }
 
 describe("request metrics", () => {
@@ -29,14 +29,18 @@ describe("request metrics", () => {
   });
 
   test("GET /work returns 200 {ok:true}", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/work`);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
   });
 
   test("GET /metrics is 200 text/plain Prometheus exposition", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await fetch(`${server.baseUrl}/work`);
     const response = await fetch(`${server.baseUrl}/metrics`);
     expect(response.status).toBe(200);
@@ -48,7 +52,9 @@ describe("request metrics", () => {
   });
 
   test("every response carries an X-Request-Id header", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/work`);
     const id = response.headers.get("x-request-id");
     expect(id).toBeTruthy();

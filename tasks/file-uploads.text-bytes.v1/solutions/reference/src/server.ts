@@ -8,7 +8,10 @@ Bun.serve({
     if (request.method === "POST" && url.pathname === "/upload") {
       const contentType = request.headers.get("content-type") ?? "";
       if (contentType.split(";")[0].trim().toLowerCase() !== "text/plain") {
-        return Response.json({ error: "unsupported_media_type" }, { status: 415 });
+        return Response.json(
+          { error: "unsupported_media_type" },
+          { status: 415 }
+        );
       }
 
       const bytes = (await request.arrayBuffer()).byteLength;

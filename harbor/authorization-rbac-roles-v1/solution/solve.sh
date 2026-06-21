@@ -7,8 +7,13 @@ mkdir -p /app/src
 cat > /app/src/server.ts <<'BUN_SERVER_BENCH_SOLUTION_EOF'
 const port = Number(Bun.env.PORT ?? 3000);
 
+const BEARER_RE = /^Bearer\s+(.+)$/;
+
 type Role = "admin" | "editor" | "viewer";
-type Principal = { user: string; role: Role };
+interface Principal {
+  role: Role;
+  user: string;
+}
 
 const TOKENS: Record<string, Principal> = {
   "tok-admin": { user: "admin", role: "admin" },
@@ -17,21 +22,31 @@ const TOKENS: Record<string, Principal> = {
   "tok-viewer": { user: "viewer", role: "viewer" },
 };
 
-type Doc = { id: string; owner: string; title: string; body: string };
+interface Doc {
+  body: string;
+  id: string;
+  owner: string;
+  title: string;
+}
 
 const docs = new Map<string, Doc>();
 let seq = 0;
 
 function authenticate(request: Request): Principal | null {
   const header = request.headers.get("authorization");
-  if (!header) return null;
-  const match = /^Bearer\s+(.+)$/.exec(header.trim());
-  if (!match) return null;
+  if (!header) {
+    return null;
+  }
+  const match = BEARER_RE.exec(header.trim());
+  if (!match) {
+    return null;
+  }
   const token = match[1].trim();
   return TOKENS[token] ?? null;
 }
 
-const unauthorized = () => Response.json({ error: "unauthorized" }, { status: 401 });
+const unauthorized = () =>
+  Response.json({ error: "unauthorized" }, { status: 401 });
 const forbidden = () => Response.json({ error: "forbidden" }, { status: 403 });
 const notFound = () => Response.json({ error: "not_found" }, { status: 404 });
 
@@ -42,11 +57,15 @@ Bun.serve({
     const segments = url.pathname.split("/").filter(Boolean);
 
     const principal = authenticate(request);
-    if (!principal) return unauthorized();
+    if (!principal) {
+      return unauthorized();
+    }
 
     // POST /documents
     if (request.method === "POST" && url.pathname === "/documents") {
-      if (principal.role !== "admin" && principal.role !== "editor") return forbidden();
+      if (principal.role !== "admin" && principal.role !== "editor") {
+        return forbidden();
+      }
       let body: unknown;
       try {
         body = await request.json();
@@ -54,11 +73,20 @@ Bun.serve({
         return Response.json({ error: "invalid_json" }, { status: 400 });
       }
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.title !== "string" || typeof record.body !== "string") {
+      if (
+        !record ||
+        typeof record.title !== "string" ||
+        typeof record.body !== "string"
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       seq += 1;
-      const doc: Doc = { id: String(seq), owner: principal.user, title: record.title, body: record.body };
+      const doc: Doc = {
+        id: String(seq),
+        owner: principal.user,
+        title: record.title,
+        body: record.body,
+      };
       docs.set(doc.id, doc);
       return Response.json(doc, { status: 201 });
     }
@@ -69,17 +97,25 @@ Bun.serve({
 
       if (request.method === "GET") {
         const doc = docs.get(id);
-        if (!doc) return notFound();
+        if (!doc) {
+          return notFound();
+        }
         return Response.json(doc, { status: 200 });
       }
 
       if (request.method === "PUT") {
         // viewer can never write.
-        if (principal.role === "viewer") return forbidden();
+        if (principal.role === "viewer") {
+          return forbidden();
+        }
         const doc = docs.get(id);
-        if (!doc) return notFound();
+        if (!doc) {
+          return notFound();
+        }
         // editor may only update documents they own; admin may update any.
-        if (principal.role !== "admin" && doc.owner !== principal.user) return forbidden();
+        if (principal.role !== "admin" && doc.owner !== principal.user) {
+          return forbidden();
+        }
         let body: unknown;
         try {
           body = await request.json();
@@ -87,17 +123,25 @@ Bun.serve({
           return Response.json({ error: "invalid_json" }, { status: 400 });
         }
         const patch = body as Record<string, unknown> | null;
-        if (typeof patch?.title === "string") doc.title = patch.title;
-        if (typeof patch?.body === "string") doc.body = patch.body;
+        if (typeof patch?.title === "string") {
+          doc.title = patch.title;
+        }
+        if (typeof patch?.body === "string") {
+          doc.body = patch.body;
+        }
         docs.set(doc.id, doc);
         return Response.json(doc, { status: 200 });
       }
 
       if (request.method === "DELETE") {
         // only admin may delete; this is a role decision independent of the resource.
-        if (principal.role !== "admin") return forbidden();
+        if (principal.role !== "admin") {
+          return forbidden();
+        }
         const doc = docs.get(id);
-        if (!doc) return notFound();
+        if (!doc) {
+          return notFound();
+        }
         docs.delete(id);
         return new Response(null, { status: 204 });
       }

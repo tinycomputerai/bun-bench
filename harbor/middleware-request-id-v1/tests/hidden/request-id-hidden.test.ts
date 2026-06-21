@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("request id edge cases", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("request id edge cases", () => {
   });
 
   test("rejects missing request id", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/request-id`);
 
@@ -22,7 +24,9 @@ describe("request id edge cases", () => {
   });
 
   test("returns JSON for unsupported paths", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/missing`, {
       headers: { "x-request-id": "req-hidden-1" },

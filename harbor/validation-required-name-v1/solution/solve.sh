@@ -20,7 +20,10 @@ Bun.serve({
         return Response.json({ error: "invalid_name" }, { status: 422 });
       }
 
-      const name = typeof body === "object" && body !== null && "name" in body ? body.name : undefined;
+      const name =
+        typeof body === "object" && body !== null && "name" in body
+          ? body.name
+          : undefined;
       if (typeof name !== "string" || name.trim().length === 0) {
         return Response.json({ error: "invalid_name" }, { status: 422 });
       }

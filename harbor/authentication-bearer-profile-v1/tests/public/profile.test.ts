@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("GET /profile", () => {
   let server: RunningServer | undefined;
@@ -13,13 +13,18 @@ describe("GET /profile", () => {
   });
 
   test("returns a profile for the valid bearer token", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/profile`, {
       headers: { authorization: "Bearer benchmark-token" },
     });
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ id: "user_1", email: "user@example.com" });
+    expect(await response.json()).toEqual({
+      id: "user_1",
+      email: "user@example.com",
+    });
   });
 });

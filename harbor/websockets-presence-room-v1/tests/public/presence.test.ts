@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let server: RunningServer | undefined;
 const sockets: WebSocket[] = [];
@@ -8,26 +8,31 @@ function wsUrl(base: string, room: string, user: string): string {
   return `${base.replace("http", "ws")}/ws?room=${encodeURIComponent(room)}&user=${encodeURIComponent(user)}`;
 }
 
-type Recorder = {
-  ws: WebSocket;
+interface Recorder {
   next: (predicate: (m: any) => boolean, ms?: number) => Promise<any>;
-};
+  ws: WebSocket;
+}
 
 function connect(url: string): Promise<Recorder> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(url);
     sockets.push(ws);
     const buffer: any[] = [];
-    let waiter: { predicate: (m: any) => boolean; resolve: (m: any) => void } | null = null;
+    let waiter: {
+      predicate: (m: any) => boolean;
+      resolve: (m: any) => void;
+    } | null = null;
 
     ws.addEventListener("message", (event: MessageEvent) => {
       let parsed: any;
       try {
-        parsed = JSON.parse(typeof event.data === "string" ? event.data : String(event.data));
+        parsed = JSON.parse(
+          typeof event.data === "string" ? event.data : String(event.data)
+        );
       } catch {
         return;
       }
-      if (waiter && waiter.predicate(parsed)) {
+      if (waiter?.predicate(parsed)) {
         const w = waiter;
         waiter = null;
         w.resolve(parsed);
@@ -36,7 +41,10 @@ function connect(url: string): Promise<Recorder> {
       buffer.push(parsed);
     });
 
-    const openTimer = setTimeout(() => reject(new Error("ws open timeout")), 4000);
+    const openTimer = setTimeout(
+      () => reject(new Error("ws open timeout")),
+      4000
+    );
     ws.addEventListener("open", () => {
       clearTimeout(openTimer);
       resolve({
@@ -72,7 +80,9 @@ function connect(url: string): Promise<Recorder> {
 
 function closed(ws: WebSocket): Promise<void> {
   return new Promise((resolve) => {
-    if (ws.readyState === WebSocket.CLOSED) return resolve();
+    if (ws.readyState === WebSocket.CLOSED) {
+      return resolve();
+    }
     ws.addEventListener("close", () => resolve());
     ws.close();
   });
@@ -87,20 +97,26 @@ describe("presence room (public)", () => {
     for (const ws of sockets) {
       try {
         ws.close();
-      } catch {}
+      } catch {
+        /* ignore */
+      }
     }
     await server?.stop();
   });
 
   test("healthz responds 200 {ok:true}", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const res = await fetch(`${server.baseUrl}/healthz`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
   });
 
   test("joining socket receives its own presence with itself listed", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const room = `pub-${Math.random().toString(36).slice(2)}`;
     const a = await connect(wsUrl(server.baseUrl, room, "alice"));
     const presence = await a.next((m) => m.type === "presence");
@@ -110,7 +126,9 @@ describe("presence room (public)", () => {
   });
 
   test("GET /rooms/:room reflects a connected member", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const room = `pub-${Math.random().toString(36).slice(2)}`;
     const a = await connect(wsUrl(server.baseUrl, room, "bob"));
     await a.next((m) => m.type === "presence");
@@ -121,7 +139,9 @@ describe("presence room (public)", () => {
   });
 
   test("GET /rooms/:room on an unknown room returns empty users", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const res = await fetch(`${server.baseUrl}/rooms/nobody-${Math.random()}`);
     expect(res.status).toBe(200);
     expect((await res.json()).users).toEqual([]);

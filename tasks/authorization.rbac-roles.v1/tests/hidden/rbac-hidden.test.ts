@@ -1,11 +1,19 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 function auth(token: string): Record<string, string> {
-  return { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  return {
+    authorization: `Bearer ${token}`,
+    "content-type": "application/json",
+  };
 }
 
-async function createDoc(baseUrl: string, token: string, title = "t", body = "b") {
+async function createDoc(
+  baseUrl: string,
+  token: string,
+  title = "t",
+  body = "b"
+) {
   const response = await fetch(`${baseUrl}/documents`, {
     method: "POST",
     headers: auth(token),
@@ -26,7 +34,9 @@ describe("rbac authorization edge cases", () => {
   });
 
   test("viewer cannot create a document (403 forbidden, not 401)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/documents`, {
       method: "POST",
       headers: auth("tok-viewer"),
@@ -37,7 +47,9 @@ describe("rbac authorization edge cases", () => {
   });
 
   test("editor can update a document they own", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const doc = await createDoc(server.baseUrl, "tok-editor", "own", "v1");
     const response = await fetch(`${server.baseUrl}/documents/${doc.id}`, {
       method: "PUT",
@@ -51,8 +63,15 @@ describe("rbac authorization edge cases", () => {
   });
 
   test("editor cannot update another editor's document (ownership enforced)", async () => {
-    if (!server) throw new Error("server did not start");
-    const doc = await createDoc(server.baseUrl, "tok-editor", "owned-by-editor", "v1");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const doc = await createDoc(
+      server.baseUrl,
+      "tok-editor",
+      "owned-by-editor",
+      "v1"
+    );
     const response = await fetch(`${server.baseUrl}/documents/${doc.id}`, {
       method: "PUT",
       headers: auth("tok-editor2"),
@@ -63,14 +82,23 @@ describe("rbac authorization edge cases", () => {
 
     // verify the document was not modified by the rejected write
     const after = await (
-      await fetch(`${server.baseUrl}/documents/${doc.id}`, { headers: { authorization: "Bearer tok-admin" } })
+      await fetch(`${server.baseUrl}/documents/${doc.id}`, {
+        headers: { authorization: "Bearer tok-admin" },
+      })
     ).json();
     expect(after.body).toBe("v1");
   });
 
   test("admin can update an editor's document (admin override)", async () => {
-    if (!server) throw new Error("server did not start");
-    const doc = await createDoc(server.baseUrl, "tok-editor", "by-editor", "v1");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const doc = await createDoc(
+      server.baseUrl,
+      "tok-editor",
+      "by-editor",
+      "v1"
+    );
     const response = await fetch(`${server.baseUrl}/documents/${doc.id}`, {
       method: "PUT",
       headers: auth("tok-admin"),
@@ -84,7 +112,9 @@ describe("rbac authorization edge cases", () => {
   });
 
   test("viewer cannot update any document (403)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const doc = await createDoc(server.baseUrl, "tok-editor", "x", "v1");
     const response = await fetch(`${server.baseUrl}/documents/${doc.id}`, {
       method: "PUT",
@@ -95,8 +125,15 @@ describe("rbac authorization edge cases", () => {
   });
 
   test("DELETE is allowed only for admin; editor and viewer get 403", async () => {
-    if (!server) throw new Error("server did not start");
-    const doc = await createDoc(server.baseUrl, "tok-editor", "to-delete", "v1");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const doc = await createDoc(
+      server.baseUrl,
+      "tok-editor",
+      "to-delete",
+      "v1"
+    );
 
     const byEditor = await fetch(`${server.baseUrl}/documents/${doc.id}`, {
       method: "DELETE",
@@ -129,7 +166,9 @@ describe("rbac authorization edge cases", () => {
   });
 
   test("unknown token returns 401, distinct from a forbidden 403", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/documents`, {
       method: "POST",
       headers: auth("tok-bogus"),
@@ -140,20 +179,28 @@ describe("rbac authorization edge cases", () => {
   });
 
   test("missing token returns 401", async () => {
-    if (!server) throw new Error("server did not start");
-    const response = await fetch(`${server.baseUrl}/documents/0`, { method: "GET" });
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const response = await fetch(`${server.baseUrl}/documents/0`, {
+      method: "GET",
+    });
     expect(response.status).toBe(401);
     expect((await response.json()).error).toBe("unauthorized");
   });
 
   test("admin can create and the document is owned by admin", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const doc = await createDoc(server.baseUrl, "tok-admin", "admin-doc", "v1");
     expect(doc.owner).toBe("admin");
   });
 
   test("reading an unknown id returns 404 for an authenticated user", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/documents/9999999`, {
       headers: { authorization: "Bearer tok-viewer" },
     });

@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let server: RunningServer | undefined;
 
-async function transfer(base: string, from: string, to: string, amount: number) {
+function transfer(base: string, from: string, to: string, amount: number) {
   return fetch(`${base}/transfer`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -29,18 +29,24 @@ describe("lock ordering hidden", () => {
   });
 
   test("opposite transfers do not deadlock", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     const results = await Promise.all([
       transfer(server.baseUrl, "a", "b", 10),
       transfer(server.baseUrl, "b", "a", 10),
       transfer(server.baseUrl, "a", "b", 10),
       transfer(server.baseUrl, "b", "a", 10),
     ]);
-    for (const r of results) expect(r.status).toBe(200);
-  }, 10000);
+    for (const r of results) {
+      expect(r.status).toBe(200);
+    }
+  }, 10_000);
 
   test("disjoint transfers complete concurrently", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     const start = Date.now();
     await Promise.all([
       transfer(server.baseUrl, "a", "b", 5),
@@ -50,7 +56,9 @@ describe("lock ordering hidden", () => {
   });
 
   test("total balance conserved", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     const before = await totalBalance(server.baseUrl);
     await Promise.all([
       transfer(server.baseUrl, "a", "c", 25),

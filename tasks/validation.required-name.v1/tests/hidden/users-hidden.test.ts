@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("user validation edge cases", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("user validation edge cases", () => {
   });
 
   test("rejects a missing name", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/users`, {
       method: "POST",
@@ -26,7 +28,9 @@ describe("user validation edge cases", () => {
   });
 
   test("rejects a blank name", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/users`, {
       method: "POST",

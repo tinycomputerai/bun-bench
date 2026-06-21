@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function hit(baseUrl: string, clientId: string) {
+function hit(baseUrl: string, clientId: string) {
   return fetch(`${baseUrl}/resource`, { headers: { "x-client-id": clientId } });
 }
 
@@ -28,12 +28,16 @@ describe("token bucket rate limit edge cases", () => {
   });
 
   test("initial burst of five succeeds and the sixth returns 429 with a valid Retry-After", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hidden-burst";
     let allowed = 0;
     for (let i = 0; i < 5; i += 1) {
       const r = await hit(server.baseUrl, client);
-      if (r.status === 200) allowed += 1;
+      if (r.status === 200) {
+        allowed += 1;
+      }
     }
     expect(allowed).toBe(5);
 
@@ -47,7 +51,9 @@ describe("token bucket rate limit edge cases", () => {
   });
 
   test("after draining, ~650ms refills roughly three tokens (at least 3, clearly fewer than 5 succeed)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hidden-refill";
     await drain(server.baseUrl, client);
 
@@ -57,14 +63,18 @@ describe("token bucket rate limit edge cases", () => {
     let allowed = 0;
     for (let i = 0; i < 5; i += 1) {
       const r = await hit(server.baseUrl, client);
-      if (r.status === 200) allowed += 1;
+      if (r.status === 200) {
+        allowed += 1;
+      }
     }
     expect(allowed).toBeGreaterThanOrEqual(3);
     expect(allowed).toBeLessThan(5);
   });
 
   test("capacity cap: drain, sleep ~2000ms (would refill 10 if uncapped), then only five succeed", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hidden-cap";
     await drain(server.baseUrl, client);
 
@@ -74,7 +84,9 @@ describe("token bucket rate limit edge cases", () => {
     let allowed = 0;
     for (let i = 0; i < 7; i += 1) {
       const r = await hit(server.baseUrl, client);
-      if (r.status === 200) allowed += 1;
+      if (r.status === 200) {
+        allowed += 1;
+      }
     }
     expect(allowed).toBe(5);
 
@@ -83,7 +95,9 @@ describe("token bucket rate limit edge cases", () => {
   });
 
   test("different clients have independent buckets", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await drain(server.baseUrl, "hidden-independent-a");
     const aBlocked = await hit(server.baseUrl, "hidden-independent-a");
     expect(aBlocked.status).toBe(429);
@@ -93,7 +107,9 @@ describe("token bucket rate limit edge cases", () => {
   });
 
   test("X-RateLimit-Remaining floors the token count on allowed requests", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const client = "hidden-remaining";
     const seen: number[] = [];
     for (let i = 0; i < 5; i += 1) {

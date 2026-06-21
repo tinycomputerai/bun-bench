@@ -61,7 +61,7 @@ order with Relay-style `page_info`.
 
 - With an empty list, return `200` with
   `{ "items": [], "page_info": { "has_next": false, "has_prev": false,
-  "start_cursor": null, "end_cursor": null } }`.
+"start_cursor": null, "end_cursor": null } }`.
 - Return JSON for every response.
 
 ## Summary

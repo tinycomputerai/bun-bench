@@ -25,7 +25,10 @@ Bun.serve({
         return Response.json({ error: "invalid_text" }, { status: 422 });
       }
 
-      const text = typeof body === "object" && body !== null && "text" in body ? body.text : undefined;
+      const text =
+        typeof body === "object" && body !== null && "text" in body
+          ? body.text
+          : undefined;
       if (typeof text !== "string" || text.trim().length === 0) {
         return Response.json({ error: "invalid_text" }, { status: 422 });
       }

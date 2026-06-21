@@ -10,27 +10,38 @@ const port = Number(Bun.env.PORT ?? 3000);
 const MAX_ATTEMPTS = 4;
 const BASE_BACKOFF_MS = 25;
 
-type JobState = {
-  id: string;
-  payload: string;
-  state: "queued" | "processing" | "completed" | "dead_letter";
+interface JobState {
   attempts: number;
+  id: string;
   last_error?: string;
+  payload: string;
   side_effects: number;
-};
+  state: "queued" | "processing" | "completed" | "dead_letter";
+}
+
+const STATUS_PATH_RE = /^\/status\/([^/]+)$/;
 
 const jobs = new Map<string, JobState>();
 const inFlight = new Map<string, Promise<void>>();
 const attemptCounts = new Map<string, number>();
 
-function classifyError(payload: string, attempt: number): "transient" | "permanent" | "success" {
-  if (payload === "ok" || payload.startsWith("ok:")) return "success";
-  if (payload.startsWith("permanent")) return "permanent";
+function classifyError(
+  payload: string,
+  attempt: number
+): "transient" | "permanent" | "success" {
+  if (payload === "ok" || payload.startsWith("ok:")) {
+    return "success";
+  }
+  if (payload.startsWith("permanent")) {
+    return "permanent";
+  }
   if (payload.startsWith("transient:")) {
     const limit = Number(payload.split(":")[1] ?? "1");
     return attempt >= limit ? "success" : "transient";
   }
-  if (payload === "poison") return "transient";
+  if (payload === "poison") {
+    return "transient";
+  }
   return "transient";
 }
 
@@ -41,7 +52,9 @@ function backoffMs(attempt: number): number {
 
 async function runJob(id: string): Promise<void> {
   const job = jobs.get(id);
-  if (!job || job.state === "completed" || job.state === "dead_letter") return;
+  if (!job || job.state === "completed" || job.state === "dead_letter") {
+    return;
+  }
 
   job.state = "processing";
   const attemptKey = `${id}:${job.attempts + 1}`;
@@ -52,9 +65,11 @@ async function runJob(id: string): Promise<void> {
   job.attempts += 1;
 
   if (outcome === "success") {
-    if (job.side_effects === 0) job.side_effects = 1;
+    if (job.side_effects === 0) {
+      job.side_effects = 1;
+    }
     job.state = "completed";
-    delete job.last_error;
+    job.last_error = undefined;
     return;
   }
 
@@ -77,11 +92,13 @@ async function runJob(id: string): Promise<void> {
 }
 
 async function enqueueProcess(id: string, payload: string): Promise<JobState> {
-  let existing = inFlight.get(id);
+  const existing = inFlight.get(id);
   if (existing) {
     await existing;
     const job = jobs.get(id);
-    if (!job) throw new Error("missing job");
+    if (!job) {
+      throw new Error("missing job");
+    }
     return job;
   }
 
@@ -104,7 +121,11 @@ async function enqueueProcess(id: string, payload: string): Promise<JobState> {
   } finally {
     inFlight.delete(id);
   }
-  return jobs.get(id)!;
+  const finished = jobs.get(id);
+  if (!finished) {
+    throw new Error("missing job");
+  }
+  return finished;
 }
 
 Bun.serve({
@@ -119,21 +140,32 @@ Bun.serve({
     if (request.method === "POST" && url.pathname === "/process") {
       const body = await request.json().catch(() => null);
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.id !== "string" || typeof record.payload !== "string") {
+      if (
+        !record ||
+        typeof record.id !== "string" ||
+        typeof record.payload !== "string"
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const job = await enqueueProcess(record.id, record.payload);
       return Response.json(
-        { id: job.id, state: job.state, attempts: job.attempts, side_effects: job.side_effects },
-        { status: job.state === "completed" ? 200 : 202 },
+        {
+          id: job.id,
+          state: job.state,
+          attempts: job.attempts,
+          side_effects: job.side_effects,
+        },
+        { status: job.state === "completed" ? 200 : 202 }
       );
     }
 
-    const statusMatch = /^\/status\/([^/]+)$/.exec(url.pathname);
+    const statusMatch = STATUS_PATH_RE.exec(url.pathname);
     if (request.method === "GET" && statusMatch) {
-      const id = decodeURIComponent(statusMatch[1]!);
+      const id = decodeURIComponent(statusMatch[1] ?? "");
       const job = jobs.get(id);
-      if (!job) return Response.json({ error: "not_found" }, { status: 404 });
+      if (!job) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
       return Response.json(
         {
           id: job.id,
@@ -142,7 +174,7 @@ Bun.serve({
           last_error: job.last_error ?? null,
           side_effects: job.side_effects,
         },
-        { status: 200 },
+        { status: 200 }
       );
     }
 

@@ -1,15 +1,22 @@
 const port = Number(Bun.env.PORT ?? 3000);
 
-type SocketData = { room: string; user: string };
+interface SocketData {
+  room: string;
+  user: string;
+}
 
 // room -> set of live sockets in that room
 const rooms = new Map<string, Set<Bun.ServerWebSocket<SocketData>>>();
 
 function usersInRoom(room: string): string[] {
   const set = rooms.get(room);
-  if (!set) return [];
+  if (!set) {
+    return [];
+  }
   const users: string[] = [];
-  for (const ws of set) users.push(ws.data.user);
+  for (const ws of set) {
+    users.push(ws.data.user);
+  }
   return users.sort();
 }
 
@@ -17,12 +24,19 @@ function presenceMessage(room: string): string {
   return JSON.stringify({ type: "presence", room, users: usersInRoom(room) });
 }
 
-function broadcastPresence(room: string, except?: Bun.ServerWebSocket<SocketData>): void {
+function broadcastPresence(
+  room: string,
+  except?: Bun.ServerWebSocket<SocketData>
+): void {
   const set = rooms.get(room);
-  if (!set) return;
+  if (!set) {
+    return;
+  }
   const payload = presenceMessage(room);
   for (const ws of set) {
-    if (ws === except) continue;
+    if (ws === except) {
+      continue;
+    }
     ws.send(payload);
   }
 }
@@ -39,16 +53,25 @@ const server = Bun.serve<SocketData>({
     if (url.pathname === "/ws") {
       const room = url.searchParams.get("room");
       const user = url.searchParams.get("user");
-      if (!room || !user) {
-        return Response.json({ error: "room_and_user_required" }, { status: 400 });
+      if (!(room && user)) {
+        return Response.json(
+          { error: "room_and_user_required" },
+          { status: 400 }
+        );
       }
       const ok = srv.upgrade(request, { data: { room, user } });
-      if (ok) return undefined;
+      if (ok) {
+        return;
+      }
       return Response.json({ error: "upgrade_failed" }, { status: 426 });
     }
 
     const segments = url.pathname.split("/").filter(Boolean);
-    if (request.method === "GET" && segments.length === 2 && segments[0] === "rooms") {
+    if (
+      request.method === "GET" &&
+      segments.length === 2 &&
+      segments[0] === "rooms"
+    ) {
       const room = decodeURIComponent(segments[1]);
       return Response.json({ room, users: usersInRoom(room) }, { status: 200 });
     }
@@ -77,20 +100,28 @@ const server = Bun.serve<SocketData>({
         return;
       }
       const msg = parsed as Record<string, unknown> | null;
-      if (!msg || msg.type !== "chat" || typeof msg.text !== "string") return;
+      if (msg?.type !== "chat" || typeof msg.text !== "string") {
+        return;
+      }
       const { room, user } = ws.data;
       const set = rooms.get(room);
-      if (!set) return;
+      if (!set) {
+        return;
+      }
       const payload = JSON.stringify({ type: "chat", user, text: msg.text });
       for (const peer of set) {
-        if (peer === ws) continue;
+        if (peer === ws) {
+          continue;
+        }
         peer.send(payload);
       }
     },
     close(ws) {
       const { room } = ws.data;
       const set = rooms.get(room);
-      if (!set) return;
+      if (!set) {
+        return;
+      }
       set.delete(ws);
       if (set.size === 0) {
         rooms.delete(room);

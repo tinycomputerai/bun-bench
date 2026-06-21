@@ -31,7 +31,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS transactions (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );`);
 
-type Account = { id: number; name: string; balance: number };
+interface Account {
+  balance: number;
+  id: number;
+  name: string;
+}
 
 function isInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value);
@@ -57,15 +61,21 @@ Bun.serve({
       let initial = 0;
       if (record.initial_balance !== undefined) {
         if (!isInteger(record.initial_balance) || record.initial_balance < 0) {
-          return Response.json({ error: "invalid_initial_balance" }, { status: 422 });
+          return Response.json(
+            { error: "invalid_initial_balance" },
+            { status: 422 }
+          );
         }
         initial = record.initial_balance;
       }
       const created = db
         .query<Account, [string, number]>(
-          "INSERT INTO accounts (name, balance) VALUES (?, ?) RETURNING id, name, balance",
+          "INSERT INTO accounts (name, balance) VALUES (?, ?) RETURNING id, name, balance"
         )
-        .get(record.name, initial)!;
+        .get(record.name, initial);
+      if (!created) {
+        return Response.json({ error: "insert_failed" }, { status: 500 });
+      }
       return Response.json(created, { status: 201 });
     }
 
@@ -79,9 +89,13 @@ Bun.serve({
         return Response.json({ error: "not_found" }, { status: 404 });
       }
       const account = db
-        .query<Account, [number]>("SELECT id, name, balance FROM accounts WHERE id = ?")
+        .query<Account, [number]>(
+          "SELECT id, name, balance FROM accounts WHERE id = ?"
+        )
         .get(id);
-      if (!account) return Response.json({ error: "not_found" }, { status: 404 });
+      if (!account) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
       return Response.json(account, { status: 200 });
     }
 
@@ -94,10 +108,12 @@ Bun.serve({
       }
       const record = body as Record<string, unknown> | null;
       if (
-        !record ||
-        !isInteger(record.from) ||
-        !isInteger(record.to) ||
-        !isInteger(record.amount)
+        !(
+          record &&
+          isInteger(record.from) &&
+          isInteger(record.to) &&
+          isInteger(record.amount)
+        )
       ) {
         return Response.json({ error: "invalid_amount" }, { status: 422 });
       }
@@ -113,21 +129,34 @@ Bun.serve({
 
       const apply = db.transaction(() => {
         const fromAcct = db
-          .query<Account, [number]>("SELECT id, name, balance FROM accounts WHERE id = ?")
+          .query<Account, [number]>(
+            "SELECT id, name, balance FROM accounts WHERE id = ?"
+          )
           .get(from);
         const toAcct = db
-          .query<Account, [number]>("SELECT id, name, balance FROM accounts WHERE id = ?")
+          .query<Account, [number]>(
+            "SELECT id, name, balance FROM accounts WHERE id = ?"
+          )
           .get(to);
-        if (!fromAcct || !toAcct) {
+        if (!(fromAcct && toAcct)) {
           return { status: 404, data: { error: "account_not_found" } as const };
         }
         if (fromAcct.balance < amount) {
-          return { status: 422, data: { error: "insufficient_funds" } as const };
+          return {
+            status: 422,
+            data: { error: "insufficient_funds" } as const,
+          };
         }
-        db.query("UPDATE accounts SET balance = balance - ? WHERE id = ?").run(amount, from);
-        db.query("UPDATE accounts SET balance = balance + ? WHERE id = ?").run(amount, to);
+        db.query("UPDATE accounts SET balance = balance - ? WHERE id = ?").run(
+          amount,
+          from
+        );
+        db.query("UPDATE accounts SET balance = balance + ? WHERE id = ?").run(
+          amount,
+          to
+        );
         db.query(
-          "INSERT INTO transactions (from_id, to_id, amount) VALUES (?, ?, ?)",
+          "INSERT INTO transactions (from_id, to_id, amount) VALUES (?, ?, ?)"
         ).run(from, to, amount);
         return { status: 200, data: { from, to, amount } };
       });

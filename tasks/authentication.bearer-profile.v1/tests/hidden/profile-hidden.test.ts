@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 describe("profile authentication edge cases", () => {
   let server: RunningServer | undefined;
@@ -13,7 +13,9 @@ describe("profile authentication edge cases", () => {
   });
 
   test("rejects missing authorization", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/profile`);
 
@@ -22,7 +24,9 @@ describe("profile authentication edge cases", () => {
   });
 
   test("rejects an invalid bearer token", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
 
     const response = await fetch(`${server.baseUrl}/profile`, {
       headers: { authorization: "Bearer wrong-token" },

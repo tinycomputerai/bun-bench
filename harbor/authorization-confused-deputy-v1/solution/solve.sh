@@ -10,7 +10,14 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 const port = Number(Bun.env.PORT ?? 3000);
 const DELEGATION_SECRET = "delegation-secret";
 
-type Resource = { id: string; owner: string; title: string };
+const BEARER_HEADER = /^Bearer\s+(.+)$/;
+const REVOKE_PATH = /^\/delegations\/([^/]+)\/revoke$/;
+
+interface Resource {
+  id: string;
+  owner: string;
+  title: string;
+}
 
 const USERS: Record<string, Set<string>> = {
   admin: new Set(["read", "write", "admin"]),
@@ -26,28 +33,42 @@ const TOKENS: Record<string, string> = {
 
 const resources = new Map<string, Resource>();
 const revokedDelegations = new Set<string>();
-const auditLog: Array<{ deputy: string; principal: string; action: string; resource_id: string; allowed: boolean }> = [];
+const auditLog: Array<{
+  deputy: string;
+  principal: string;
+  action: string;
+  resource_id: string;
+  allowed: boolean;
+}> = [];
 
 function intersectScopes(a: Set<string>, b: Set<string>): Set<string> {
   const out = new Set<string>();
   for (const scope of a) {
-    if (b.has(scope)) out.add(scope);
+    if (b.has(scope)) {
+      out.add(scope);
+    }
   }
   return out;
 }
 
 function authenticate(request: Request): string | null {
   const header = request.headers.get("authorization");
-  if (!header) return null;
-  const match = /^Bearer\s+(.+)$/.exec(header.trim());
-  if (!match) return null;
+  if (!header) {
+    return null;
+  }
+  const match = BEARER_HEADER.exec(header.trim());
+  if (!match) {
+    return null;
+  }
   const token = match[1].trim();
   return TOKENS[token] ?? null;
 }
 
 function signDelegation(payload: object): string {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const sig = createHmac("sha256", DELEGATION_SECRET).update(body).digest("base64url");
+  const sig = createHmac("sha256", DELEGATION_SECRET)
+    .update(body)
+    .digest("base64url");
   return `${body}.${sig}`;
 }
 
@@ -59,12 +80,18 @@ function verifyDelegation(token: string): {
   chain?: string[];
 } | null {
   const parts = token.split(".");
-  if (parts.length !== 2) return null;
+  if (parts.length !== 2) {
+    return null;
+  }
   const [body, sig] = parts;
-  const expected = createHmac("sha256", DELEGATION_SECRET).update(body).digest("base64url");
+  const expected = createHmac("sha256", DELEGATION_SECRET)
+    .update(body)
+    .digest("base64url");
   const a = Buffer.from(sig, "utf8");
   const b = Buffer.from(expected, "utf8");
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return null;
+  }
   try {
     return JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
   } catch {
@@ -76,25 +103,38 @@ function resourcePolicy(
   action: string,
   resource: Resource,
   scopes: Set<string>,
-  principal: string,
+  principal: string
 ): boolean {
-  if (action === "read") return scopes.has("read");
+  if (action === "read") {
+    return scopes.has("read");
+  }
   if (action === "write") {
-    if (!scopes.has("write")) return false;
+    if (!scopes.has("write")) {
+      return false;
+    }
     return scopes.has("admin") || resource.owner === principal;
   }
   return false;
 }
 
-function effectiveScopes(caller: string, delegation: { principal: string; scopes: string[]; chain?: string[] }): Set<string> {
+function effectiveScopes(
+  caller: string,
+  delegation: { principal: string; scopes: string[]; chain?: string[] }
+): Set<string> {
   const callerScopes = USERS[caller] ?? new Set<string>();
   let delegated = new Set(delegation.scopes);
   if (delegation.chain) {
     for (const parent of delegation.chain) {
-      delegated = intersectScopes(delegated, USERS[parent] ?? new Set<string>());
+      delegated = intersectScopes(
+        delegated,
+        USERS[parent] ?? new Set<string>()
+      );
     }
   }
-  delegated = intersectScopes(delegated, USERS[delegation.principal] ?? new Set<string>());
+  delegated = intersectScopes(
+    delegated,
+    USERS[delegation.principal] ?? new Set<string>()
+  );
   return intersectScopes(callerScopes, delegated);
 }
 
@@ -114,26 +154,40 @@ Bun.serve({
     const caller = authenticate(request);
 
     if (request.method === "POST" && url.pathname === "/resources") {
-      if (!caller) return Response.json({ error: "unauthorized" }, { status: 401 });
+      if (!caller) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
       const body = await request.json().catch(() => null);
       const record = body as Record<string, unknown> | null;
       if (!record || typeof record.title !== "string") {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const id = `res-${resources.size + 1}`;
-      const resource: Resource = { id, owner: caller === "admin" ? "admin" : "editor", title: record.title };
+      const resource: Resource = {
+        id,
+        owner: caller === "admin" ? "admin" : "editor",
+        title: record.title,
+      };
       resources.set(id, resource);
       return Response.json(resource, { status: 201 });
     }
 
     if (request.method === "POST" && url.pathname === "/delegations") {
-      if (!caller) return Response.json({ error: "unauthorized" }, { status: 401 });
+      if (!caller) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
       const body = await request.json().catch(() => null);
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.principal !== "string" || !Array.isArray(record.scopes)) {
+      if (
+        !record ||
+        typeof record.principal !== "string" ||
+        !Array.isArray(record.scopes)
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
-      const requested = new Set(record.scopes.filter((s): s is string => typeof s === "string"));
+      const requested = new Set(
+        record.scopes.filter((s): s is string => typeof s === "string")
+      );
       const callerScopes = USERS[caller] ?? new Set<string>();
       for (const scope of requested) {
         if (!callerScopes.has(scope)) {
@@ -146,17 +200,28 @@ Bun.serve({
         principal: record.principal,
         scopes: [...requested],
         exp: Math.floor(Date.now() / 1000) + 3600,
-        chain: Array.isArray(record.chain) ? record.chain.filter((c): c is string => typeof c === "string") : undefined,
+        chain: Array.isArray(record.chain)
+          ? record.chain.filter((c): c is string => typeof c === "string")
+          : undefined,
       };
-      return Response.json({ id, token: signDelegation(payload) }, { status: 201 });
+      return Response.json(
+        { id, token: signDelegation(payload) },
+        { status: 201 }
+      );
     }
 
     if (request.method === "POST" && url.pathname === "/act-as") {
-      if (!caller) return Response.json({ error: "unauthorized" }, { status: 401 });
+      if (!caller) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
       const delegationRaw = request.headers.get("x-delegation-token");
-      if (!delegationRaw) return Response.json({ error: "missing_delegation" }, { status: 401 });
+      if (!delegationRaw) {
+        return Response.json({ error: "missing_delegation" }, { status: 401 });
+      }
       const delegation = verifyDelegation(delegationRaw);
-      if (!delegation) return Response.json({ error: "invalid_delegation" }, { status: 403 });
+      if (!delegation) {
+        return Response.json({ error: "invalid_delegation" }, { status: 403 });
+      }
       if (delegation.exp <= Math.floor(Date.now() / 1000)) {
         return Response.json({ error: "delegation_expired" }, { status: 403 });
       }
@@ -166,15 +231,26 @@ Bun.serve({
 
       const body = await request.json().catch(() => null);
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.action !== "string" || typeof record.resource_id !== "string") {
+      if (
+        !record ||
+        typeof record.action !== "string" ||
+        typeof record.resource_id !== "string"
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
 
       const resource = resources.get(record.resource_id);
-      if (!resource) return Response.json({ error: "not_found" }, { status: 404 });
+      if (!resource) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
 
       const scopes = effectiveScopes(caller, delegation);
-      const allowed = resourcePolicy(record.action, resource, scopes, delegation.principal);
+      const allowed = resourcePolicy(
+        record.action,
+        resource,
+        scopes,
+        delegation.principal
+      );
       auditLog.push({
         deputy: caller,
         principal: delegation.principal,
@@ -182,7 +258,9 @@ Bun.serve({
         resource_id: resource.id,
         allowed,
       });
-      if (!allowed) return Response.json({ error: "forbidden" }, { status: 403 });
+      if (!allowed) {
+        return Response.json({ error: "forbidden" }, { status: 403 });
+      }
       return Response.json(
         {
           ok: true,
@@ -191,14 +269,17 @@ Bun.serve({
           deputy: caller,
           effective_scopes: [...scopes],
         },
-        { status: 200 },
+        { status: 200 }
       );
     }
 
-    const revokeMatch = /^\/delegations\/([^/]+)\/revoke$/.exec(url.pathname);
+    const revokeMatch = REVOKE_PATH.exec(url.pathname);
     if (request.method === "POST" && revokeMatch) {
-      if (!caller) return Response.json({ error: "unauthorized" }, { status: 401 });
-      revokedDelegations.add(decodeURIComponent(revokeMatch[1]!));
+      if (!caller) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      const delegationId = revokeMatch[1];
+      revokedDelegations.add(decodeURIComponent(delegationId));
       return Response.json({ revoked: true }, { status: 200 });
     }
 
@@ -206,7 +287,11 @@ Bun.serve({
   },
 });
 
-resources.set("res-1", { id: "res-1", owner: "editor", title: "owned-by-editor" });
+resources.set("res-1", {
+  id: "res-1",
+  owner: "editor",
+  title: "owned-by-editor",
+});
 
 console.log(`confused-deputy reference listening on ${port}`);
 BUN_SERVER_BENCH_SOLUTION_EOF

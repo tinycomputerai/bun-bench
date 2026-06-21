@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
+
+const QUOTED_ETAG_RE = /^"[0-9a-f]{64}"$/;
 
 async function createConfig(baseUrl: string, key = "feature", value = "on") {
   const response = await fetch(`${baseUrl}/configs`, {
@@ -22,7 +24,9 @@ describe("etag-concurrency config store", () => {
   });
 
   test("creates a config and returns a quoted hex ETag", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await createConfig(server.baseUrl, "color", "blue");
     expect(response.status).toBe(201);
     const entry = await response.json();
@@ -32,11 +36,13 @@ describe("etag-concurrency config store", () => {
 
     const etag = response.headers.get("etag");
     expect(etag).not.toBeNull();
-    expect(etag).toMatch(/^"[0-9a-f]{64}"$/);
+    expect(etag).toMatch(QUOTED_ETAG_RE);
   });
 
   test("GET returns the entry with the current ETag", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await createConfig(server.baseUrl, "size", "large");
     const createdEtag = created.headers.get("etag");
     const entry = await created.json();
@@ -49,7 +55,9 @@ describe("etag-concurrency config store", () => {
   });
 
   test("PUT with the matching If-Match applies the update", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await createConfig(server.baseUrl, "mode", "v1");
     const etag = created.headers.get("etag")!;
     const entry = await created.json();
@@ -67,7 +75,9 @@ describe("etag-concurrency config store", () => {
   });
 
   test("invalid body is rejected with 422", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/configs`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -77,7 +87,9 @@ describe("etag-concurrency config store", () => {
   });
 
   test("unknown id returns 404", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/configs/unknown-id`);
     expect(response.status).toBe(404);
   });

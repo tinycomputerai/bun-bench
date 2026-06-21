@@ -41,7 +41,10 @@ function sleep(ms: number): Promise<void> {
 // Resolve the effective breaker state, transitioning open -> half_open once the
 // cooldown has elapsed.
 function effectiveState(): BreakerState {
-  if (breaker.state === "open" && Date.now() - breaker.openedAt >= COOLDOWN_MS) {
+  if (
+    breaker.state === "open" &&
+    Date.now() - breaker.openedAt >= COOLDOWN_MS
+  ) {
     breaker.state = "half_open";
   }
   return breaker.state;
@@ -78,11 +81,16 @@ async function callWithRetry(): Promise<Response> {
       onCallSuccess();
       return Response.json({ ok: true, attempts: attempt }, { status: 200 });
     } catch {
-      if (attempt < MAX_ATTEMPTS) await sleep(BACKOFF_MS);
+      if (attempt < MAX_ATTEMPTS) {
+        await sleep(BACKOFF_MS);
+      }
     }
   }
   onCallFailure();
-  return Response.json({ error: "upstream_failed", attempts: MAX_ATTEMPTS }, { status: 502 });
+  return Response.json(
+    { error: "upstream_failed", attempts: MAX_ATTEMPTS },
+    { status: 502 }
+  );
 }
 
 // Attempt the dependency for a non-idempotent (POST) call: at most once.
@@ -93,7 +101,10 @@ function callOnce(): Response {
     return Response.json({ ok: true, attempts: 1 }, { status: 200 });
   } catch {
     onCallFailure();
-    return Response.json({ error: "upstream_failed", attempts: 1 }, { status: 502 });
+    return Response.json(
+      { error: "upstream_failed", attempts: 1 },
+      { status: 502 }
+    );
   }
 }
 
@@ -111,7 +122,7 @@ Bun.serve({
           consecutive_failures: breaker.consecutiveFailures,
           dependency_calls: dependency.calls,
         },
-        { status: 200 },
+        { status: 200 }
       );
     }
 
@@ -130,7 +141,10 @@ Bun.serve({
       return Response.json({ mode }, { status: 200 });
     }
 
-    if (path === "/call" && (request.method === "GET" || request.method === "POST")) {
+    if (
+      path === "/call" &&
+      (request.method === "GET" || request.method === "POST")
+    ) {
       // Fail fast while the circuit is open.
       if (effectiveState() === "open") {
         return circuitOpenResponse();

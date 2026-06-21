@@ -1,7 +1,14 @@
 const port = Number(Bun.env.PORT ?? 3000);
 
-type SocketData = { channel: string };
-type Buffered = { seq: number; data: unknown };
+const DIGITS_RE = /^\d+$/;
+
+interface SocketData {
+  channel: string;
+}
+interface Buffered {
+  data: unknown;
+  seq: number;
+}
 
 // channel -> ordered buffer of all published messages
 const buffers = new Map<string, Buffered[]>();
@@ -33,7 +40,11 @@ const server = Bun.serve<SocketData>({
         return Response.json({ error: "invalid_json" }, { status: 400 });
       }
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.channel !== "string" || !("data" in record)) {
+      if (
+        !record ||
+        typeof record.channel !== "string" ||
+        !("data" in record)
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const channel = record.channel;
@@ -49,7 +60,9 @@ const server = Bun.serve<SocketData>({
       const subs = subscribers.get(channel);
       if (subs) {
         const payload = JSON.stringify({ seq, data });
-        for (const ws of subs) ws.send(payload);
+        for (const ws of subs) {
+          ws.send(payload);
+        }
       }
       return Response.json({ channel, seq }, { status: 201 });
     }
@@ -62,13 +75,17 @@ const server = Bun.serve<SocketData>({
       const rawLast = url.searchParams.get("last_seq");
       let lastSeen = 0;
       if (rawLast !== null) {
-        if (!/^\d+$/.test(rawLast)) {
+        if (!DIGITS_RE.test(rawLast)) {
           return Response.json({ error: "invalid_last_seq" }, { status: 400 });
         }
         lastSeen = Number(rawLast);
       }
-      const ok = srv.upgrade(request, { data: { channel, lastSeen } as SocketData & { lastSeen: number } });
-      if (ok) return undefined;
+      const ok = srv.upgrade(request, {
+        data: { channel, lastSeen } as SocketData & { lastSeen: number },
+      });
+      if (ok) {
+        return;
+      }
       return Response.json({ error: "upgrade_failed" }, { status: 426 });
     }
 
@@ -104,9 +121,13 @@ const server = Bun.serve<SocketData>({
     close(ws) {
       const { channel } = ws.data;
       const subs = subscribers.get(channel);
-      if (!subs) return;
+      if (!subs) {
+        return;
+      }
       subs.delete(ws);
-      if (subs.size === 0) subscribers.delete(channel);
+      if (subs.size === 0) {
+        subscribers.delete(channel);
+      }
     },
   },
 });

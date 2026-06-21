@@ -4,14 +4,14 @@ const port = Number(Bun.env.PORT ?? 3000);
 
 type Status = "queued" | "running" | "retrying" | "succeeded" | "dead_letter";
 
-type Job = {
-  id: string;
-  type: string;
-  status: Status;
+interface Job {
   attempts: number;
-  max_attempts: number;
+  id: string;
   last_error?: string;
-};
+  max_attempts: number;
+  status: Status;
+  type: string;
+}
 
 const MAX_ATTEMPTS = 3;
 const jobs = new Map<string, Job>();
@@ -28,7 +28,6 @@ function runJob(type: string, attempt: number): boolean {
       return true;
     case "flaky":
       return attempt >= 3;
-    case "fail":
     default:
       return false;
   }
@@ -45,11 +44,17 @@ function schedule(job: Job, delay: number): void {
 
 function process(id: string): void {
   const job = jobs.get(id);
-  if (!job) return;
+  if (!job) {
+    return;
+  }
   // Terminal jobs are never reprocessed.
-  if (isTerminal(job.status)) return;
+  if (isTerminal(job.status)) {
+    return;
+  }
   // Guard against an already-running job being picked up twice.
-  if (job.status === "running") return;
+  if (job.status === "running") {
+    return;
+  }
 
   job.status = "running";
   const attempt = job.attempts + 1;
@@ -83,7 +88,9 @@ function publicJob(job: Job): Record<string, unknown> {
     attempts: job.attempts,
     max_attempts: job.max_attempts,
   };
-  if (job.last_error !== undefined) out.last_error = job.last_error;
+  if (job.last_error !== undefined) {
+    out.last_error = job.last_error;
+  }
   return out;
 }
 
@@ -115,14 +122,26 @@ Bun.serve({
       // Process asynchronously, decoupled from this request.
       schedule(job, 0);
       return Response.json(
-        { id: job.id, status: "queued", attempts: 0, max_attempts: MAX_ATTEMPTS },
-        { status: 201 },
+        {
+          id: job.id,
+          status: "queued",
+          attempts: 0,
+          max_attempts: MAX_ATTEMPTS,
+        },
+        { status: 201 }
       );
     }
 
-    if (segments.length === 2 && segments[0] === "jobs" && request.method === "GET") {
-      const job = jobs.get(segments[1]!);
-      if (!job) return Response.json({ error: "not_found" }, { status: 404 });
+    if (
+      segments.length === 2 &&
+      segments[0] === "jobs" &&
+      request.method === "GET"
+    ) {
+      const jobId = segments[1] ?? "";
+      const job = jobs.get(jobId);
+      if (!job) {
+        return Response.json({ error: "not_found" }, { status: 404 });
+      }
       return Response.json(publicJob(job), { status: 200 });
     }
 

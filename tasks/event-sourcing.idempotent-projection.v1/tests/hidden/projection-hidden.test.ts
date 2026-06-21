@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
-async function append(baseUrl: string, body: object) {
+function append(baseUrl: string, body: object) {
   return fetch(`${baseUrl}/events`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -10,11 +10,15 @@ async function append(baseUrl: string, body: object) {
 }
 
 async function projection(baseUrl: string, id: string) {
-  return (await fetch(`${baseUrl}/projections/${encodeURIComponent(id)}`)).json();
+  return (
+    await fetch(`${baseUrl}/projections/${encodeURIComponent(id)}`)
+  ).json();
 }
 
-async function rebuild(baseUrl: string, id: string) {
-  return fetch(`${baseUrl}/projections/${encodeURIComponent(id)}/rebuild`, { method: "POST" });
+function rebuild(baseUrl: string, id: string) {
+  return fetch(`${baseUrl}/projections/${encodeURIComponent(id)}/rebuild`, {
+    method: "POST",
+  });
 }
 
 describe("idempotent projection hidden", () => {
@@ -29,21 +33,45 @@ describe("idempotent projection hidden", () => {
   });
 
   test("out-of-order events buffer until gap filled", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const agg = "hid-order";
-    await append(server.baseUrl, { aggregate_id: agg, version: 1, type: "created", data: { name: "x" } });
-    await append(server.baseUrl, { aggregate_id: agg, version: 3, type: "increment", data: { amount: 5 } });
+    await append(server.baseUrl, {
+      aggregate_id: agg,
+      version: 1,
+      type: "created",
+      data: { name: "x" },
+    });
+    await append(server.baseUrl, {
+      aggregate_id: agg,
+      version: 3,
+      type: "increment",
+      data: { amount: 5 },
+    });
     expect((await projection(server.baseUrl, agg)).last_version).toBe(1);
-    await append(server.baseUrl, { aggregate_id: agg, version: 2, type: "increment", data: { amount: 2 } });
+    await append(server.baseUrl, {
+      aggregate_id: agg,
+      version: 2,
+      type: "increment",
+      data: { amount: 2 },
+    });
     const state = await projection(server.baseUrl, agg);
     expect(state.total).toBe(7);
     expect(state.last_version).toBe(3);
   });
 
   test("version conflict on same version different payload", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const agg = "hid-conflict";
-    await append(server.baseUrl, { aggregate_id: agg, version: 1, type: "increment", data: { amount: 1 } });
+    await append(server.baseUrl, {
+      aggregate_id: agg,
+      version: 1,
+      type: "increment",
+      data: { amount: 1 },
+    });
     const conflict = await append(server.baseUrl, {
       aggregate_id: agg,
       version: 1,
@@ -54,7 +82,9 @@ describe("idempotent projection hidden", () => {
   });
 
   test("large gap is rejected", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const agg = "hid-gap";
     const response = await append(server.baseUrl, {
       aggregate_id: agg,
@@ -66,7 +96,9 @@ describe("idempotent projection hidden", () => {
   });
 
   test("unknown event type is quarantined", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const agg = "hid-poison";
     const resp = await append(server.baseUrl, {
       aggregate_id: agg,
@@ -80,10 +112,22 @@ describe("idempotent projection hidden", () => {
   });
 
   test("rebuild matches incremental projection", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const agg = "hid-rebuild";
-    await append(server.baseUrl, { aggregate_id: agg, version: 1, type: "created", data: { name: "r" } });
-    await append(server.baseUrl, { aggregate_id: agg, version: 2, type: "increment", data: { amount: 4 } });
+    await append(server.baseUrl, {
+      aggregate_id: agg,
+      version: 1,
+      type: "created",
+      data: { name: "r" },
+    });
+    await append(server.baseUrl, {
+      aggregate_id: agg,
+      version: 2,
+      type: "increment",
+      data: { amount: 4 },
+    });
     const incremental = await projection(server.baseUrl, agg);
     const rebuilt = await (await rebuild(server.baseUrl, agg)).json();
     expect(rebuilt).toEqual(incremental);

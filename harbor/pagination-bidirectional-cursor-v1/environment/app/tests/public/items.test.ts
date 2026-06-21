@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 async function createItem(baseUrl: string, label: string): Promise<number> {
   const response = await fetch(`${baseUrl}/items`, {
@@ -23,14 +23,18 @@ describe("bidirectional cursor pagination", () => {
   });
 
   test("creates items with monotonic ids", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const a = await createItem(server.baseUrl, "a");
     const b = await createItem(server.baseUrl, "b");
     expect(b).toBe(a + 1);
   });
 
   test("forward paging returns ascending items with page_info", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await createItem(server.baseUrl, "x");
     await createItem(server.baseUrl, "y");
 
@@ -43,15 +47,19 @@ describe("bidirectional cursor pagination", () => {
     expect(typeof page.page_info.end_cursor).toBe("string");
 
     const next = await (
-      await fetch(`${server.baseUrl}/items?limit=2&after=${encodeURIComponent(page.page_info.end_cursor)}`)
+      await fetch(
+        `${server.baseUrl}/items?limit=2&after=${encodeURIComponent(page.page_info.end_cursor)}`
+      )
     ).json();
     for (const item of next.items) {
-      expect(item.id).toBeGreaterThan(page.items[page.items.length - 1].id);
+      expect(item.id).toBeGreaterThan(page.items.at(-1).id);
     }
   });
 
   test("invalid body returns 422", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/items`, {
       method: "POST",
       headers: { "content-type": "application/json" },

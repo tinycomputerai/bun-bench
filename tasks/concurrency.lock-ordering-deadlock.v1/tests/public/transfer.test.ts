@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 let server: RunningServer | undefined;
 
-async function transfer(base: string, from: string, to: string, amount: number) {
+function transfer(base: string, from: string, to: string, amount: number) {
   return fetch(`${base}/transfer`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -20,13 +20,17 @@ describe("lock ordering public", () => {
   });
 
   test("healthz", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     const res = await fetch(`${server.baseUrl}/healthz`);
     expect(res.status).toBe(200);
   });
 
   test("transfer updates balances", async () => {
-    if (!server) throw new Error("no server");
+    if (!server) {
+      throw new Error("no server");
+    }
     const res = await transfer(server.baseUrl, "a", "b", 100);
     expect(res.status).toBe(200);
     const a = await (await fetch(`${server.baseUrl}/accounts/a`)).json();

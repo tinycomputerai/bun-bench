@@ -4,19 +4,19 @@ const port = Number(Bun.env.PORT ?? 3000);
 const WORKERS = 4;
 const MAX_KEY_DEPTH = 50;
 
-type QueueJob = {
-  id: string;
-  key: string;
-  payload: string;
+interface QueueJob {
   attempts: number;
-};
-
-type ProcessedItem = {
   id: string;
   key: string;
   payload: string;
+}
+
+interface ProcessedItem {
+  id: string;
+  key: string;
   key_sequence: number;
-};
+  payload: string;
+}
 
 const perKeyQueues = new Map<string, QueueJob[]>();
 const busyKeys = new Set<string>();
@@ -107,8 +107,12 @@ async function workerLoop(): Promise<void> {
     }
 
     busyKeys.add(key);
-    const queue = perKeyQueues.get(key)!;
-    const job = queue.shift()!;
+    const queue = perKeyQueues.get(key);
+    const job = queue?.shift();
+    if (!(queue && job)) {
+      busyKeys.delete(key);
+      continue;
+    }
     if (queue.length === 0) {
       perKeyQueues.delete(key);
     }
@@ -131,7 +135,7 @@ async function workerLoop(): Promise<void> {
 }
 
 for (let i = 0; i < WORKERS; i += 1) {
-  void workerLoop();
+  workerLoop().catch(() => undefined);
 }
 
 Bun.serve({
@@ -153,7 +157,7 @@ Bun.serve({
           in_flight: [...inFlight.entries()].map(([key, id]) => ({ key, id })),
           workers: WORKERS,
         },
-        { status: 200 },
+        { status: 200 }
       );
     }
 
@@ -165,7 +169,11 @@ Bun.serve({
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const record = body as Record<string, unknown> | null;
-      if (!record || typeof record.key !== "string" || typeof record.payload !== "string") {
+      if (
+        !record ||
+        typeof record.key !== "string" ||
+        typeof record.payload !== "string"
+      ) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       if (record.key.length === 0) {
@@ -176,7 +184,10 @@ Bun.serve({
       if (job === "backpressure") {
         return Response.json({ error: "backpressure" }, { status: 429 });
       }
-      return Response.json({ id: job.id, key: job.key, queued: true }, { status: 202 });
+      return Response.json(
+        { id: job.id, key: job.key, queued: true },
+        { status: 202 }
+      );
     }
 
     return Response.json({ error: "not_found" }, { status: 404 });

@@ -4,13 +4,11 @@
   "files": {
     "includes": [
       "!**/node_modules",
-      "!bun.lock",
+      "!**/bun.lock",
       // Markdown is handled by Prettier.
       "!**/*.md",
-      // Benchmark content — never reformat (changes agent-visible task source
-      // and would invalidate the committed Harbor exports / digests).
-      "!tasks",
-      // Generated artifacts and run/data outputs.
+      // Generated Harbor projection — produced by the export adapter, not
+      // hand-edited.
       "!harbor",
       "!.chunks",
       "!runs",
@@ -34,5 +32,20 @@
         "noExcessiveCognitiveComplexity": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      // Tests legitimately use non-null assertions — a closure over a `let`
+      // loses the `if (!x) throw` narrowing, so `x!` is idiomatic. The autofix
+      // rewrites test control flow rather than formatting, so relax it here.
+      "includes": ["**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    }
+  ]
 }

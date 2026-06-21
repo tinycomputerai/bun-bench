@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
+
+const QUOTED_ETAG_RE = /^"[0-9a-f]{64}"$/;
+const BARE_HEX_RE = /^[0-9a-f]{64}$/;
+const QUOTED_TAG_RE = /^"(.*)"$/;
 
 async function createConfig(baseUrl: string, key = "k", value = "v") {
   const response = await fetch(`${baseUrl}/configs`, {
@@ -22,12 +26,14 @@ describe("strong ETag optimistic concurrency edge cases", () => {
   });
 
   test("ETag is a stable content hash: same content -> same ETag", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const a = await createConfig(server.baseUrl, "dup", "same");
     const b = await createConfig(server.baseUrl, "dup", "same");
     const etagA = a.headers.get("etag");
     const etagB = b.headers.get("etag");
-    expect(etagA).toMatch(/^"[0-9a-f]{64}"$/);
+    expect(etagA).toMatch(QUOTED_ETAG_RE);
     expect(etagA).toBe(etagB);
 
     // distinct resources despite identical content
@@ -37,7 +43,9 @@ describe("strong ETag optimistic concurrency edge cases", () => {
   });
 
   test("GET twice returns an identical ETag", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await createConfig(server.baseUrl, "stable", "x");
     const id = (await created.json()).id;
     const first = await fetch(`${server.baseUrl}/configs/${id}`);
@@ -46,7 +54,9 @@ describe("strong ETag optimistic concurrency edge cases", () => {
   });
 
   test("changing value changes the ETag; same value keeps it identical", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await createConfig(server.baseUrl, "ch", "before");
     const original = created.headers.get("etag")!;
     const id = (await created.json()).id;
@@ -71,7 +81,9 @@ describe("strong ETag optimistic concurrency edge cases", () => {
   });
 
   test("a stale If-Match (ETag from before an update) returns 412", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await createConfig(server.baseUrl, "stale", "v1");
     const staleEtag = created.headers.get("etag")!;
     const id = (await created.json()).id;
@@ -93,7 +105,9 @@ describe("strong ETag optimistic concurrency edge cases", () => {
   });
 
   test("two concurrent PUTs on the same ETag: exactly one 200, one 412", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await createConfig(server.baseUrl, "race", "v1");
     const etag = created.headers.get("etag")!;
     const id = (await created.json()).id;
@@ -116,20 +130,25 @@ describe("strong ETag optimistic concurrency edge cases", () => {
   });
 
   test("If-Match comparison ignores quotes and W/ prefix", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await createConfig(server.baseUrl, "weak", "v1");
     const quoted = created.headers.get("etag")!; // "<hex>"
     const id = (await created.json()).id;
-    const bareHex = quoted.replace(/^"(.*)"$/, "$1");
+    const bareHex = quoted.replace(QUOTED_TAG_RE, "$1");
 
     const withWeakPrefix = await fetch(`${server.baseUrl}/configs/${id}`, {
       method: "PUT",
-      headers: { "content-type": "application/json", "if-match": `W/${quoted}` },
+      headers: {
+        "content-type": "application/json",
+        "if-match": `W/${quoted}`,
+      },
       body: JSON.stringify({ value: "v2" }),
     });
     expect(withWeakPrefix.status).toBe(200);
     const newEtag = withWeakPrefix.headers.get("etag")!;
-    const newBare = newEtag.replace(/^"(.*)"$/, "$1");
+    const newBare = newEtag.replace(QUOTED_TAG_RE, "$1");
 
     // bare unquoted hex must also be accepted
     const withBare = await fetch(`${server.baseUrl}/configs/${id}`, {
@@ -138,11 +157,13 @@ describe("strong ETag optimistic concurrency edge cases", () => {
       body: JSON.stringify({ value: "v3" }),
     });
     expect(withBare.status).toBe(200);
-    expect(bareHex).toMatch(/^[0-9a-f]{64}$/);
+    expect(bareHex).toMatch(BARE_HEX_RE);
   });
 
   test("If-Match * (wildcard) succeeds on an existing resource", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await createConfig(server.baseUrl, "wild", "v1");
     const id = (await created.json()).id;
 
@@ -156,7 +177,9 @@ describe("strong ETag optimistic concurrency edge cases", () => {
   });
 
   test("missing If-Match returns 428", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await createConfig(server.baseUrl, "noguard", "v1");
     const id = (await created.json()).id;
 
@@ -170,7 +193,9 @@ describe("strong ETag optimistic concurrency edge cases", () => {
   });
 
   test("mismatched If-Match on an unchanged resource returns 412", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const created = await createConfig(server.baseUrl, "bad", "v1");
     const id = (await created.json()).id;
 
@@ -178,7 +203,8 @@ describe("strong ETag optimistic concurrency edge cases", () => {
       method: "PUT",
       headers: {
         "content-type": "application/json",
-        "if-match": '"0000000000000000000000000000000000000000000000000000000000000000"',
+        "if-match":
+          '"0000000000000000000000000000000000000000000000000000000000000000"',
       },
       body: JSON.stringify({ value: "x" }),
     });
@@ -187,7 +213,9 @@ describe("strong ETag optimistic concurrency edge cases", () => {
   });
 
   test("PUT on an unknown id returns 404", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/configs/does-not-exist`, {
       method: "PUT",
       headers: { "content-type": "application/json", "if-match": "*" },

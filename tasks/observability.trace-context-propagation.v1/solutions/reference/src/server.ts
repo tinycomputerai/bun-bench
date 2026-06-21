@@ -4,20 +4,25 @@ import { randomBytes } from "node:crypto";
 const port = Number(Bun.env.PORT ?? 3000);
 const TRACE_STATE_LIMIT = 512;
 
-type Span = {
+const TRACE_ID_RE = /^[0-9a-f]{32}$/;
+const PARENT_ID_RE = /^[0-9a-f]{16}$/;
+const FLAGS_RE = /^[0-9a-f]{2}$/;
+const TRACE_PATH_RE = /^\/trace\/([0-9a-f]{32})$/;
+
+interface Span {
+  name: string;
+  parent_span_id: string | null;
+  sampled: boolean;
   span_id: string;
   trace_id: string;
-  parent_span_id: string | null;
-  name: string;
-  sampled: boolean;
-};
+}
 
-type TraceContext = {
-  trace_id: string;
+interface TraceContext {
   current_span_id: string;
   sampled: boolean;
+  trace_id: string;
   tracestate: string;
-};
+}
 
 const traces = new Map<string, Span[]>();
 const als = new AsyncLocalStorage<TraceContext>();
@@ -26,21 +31,41 @@ function randomHex(bytes: number): string {
   return randomBytes(bytes).toString("hex");
 }
 
-function parseTraceparent(header: string | null): { trace_id: string; parent_span_id: string | null; sampled: boolean } | null {
-  if (!header) return null;
-  const parts = header.trim().split("-");
-  if (parts.length !== 4) return null;
-  const [version, traceId, parentId, flags] = parts;
-  if (version !== "00") return null;
-  if (!/^[0-9a-f]{32}$/.test(traceId) || !/^[0-9a-f]{16}$/.test(parentId) || !/^[0-9a-f]{2}$/.test(flags)) {
+function parseTraceparent(header: string | null): {
+  trace_id: string;
+  parent_span_id: string | null;
+  sampled: boolean;
+} | null {
+  if (!header) {
     return null;
   }
-  const sampled = (parseInt(flags, 16) & 0x01) === 1;
+  const parts = header.trim().split("-");
+  if (parts.length !== 4) {
+    return null;
+  }
+  const [version, traceId, parentId, flags] = parts;
+  if (version !== "00") {
+    return null;
+  }
+  if (
+    !(
+      TRACE_ID_RE.test(traceId) &&
+      PARENT_ID_RE.test(parentId) &&
+      FLAGS_RE.test(flags)
+    )
+  ) {
+    return null;
+  }
+  // biome-ignore lint/suspicious/noBitwiseOperators: W3C traceparent sampled-bit (0x01) test
+  const sampled = (Number.parseInt(flags, 16) & 0x01) === 1;
   return { trace_id: traceId, parent_span_id: parentId, sampled };
 }
 
 function mergeTracestate(inbound: string | null, existing: string): string {
-  const parts = [...(inbound ? inbound.split(",") : []), ...(existing ? existing.split(",") : [])]
+  const parts = [
+    ...(inbound ? inbound.split(",") : []),
+    ...(existing ? existing.split(",") : []),
+  ]
     .map((p) => p.trim())
     .filter(Boolean);
   let merged = parts.join(",");
@@ -48,22 +73,42 @@ function mergeTracestate(inbound: string | null, existing: string): string {
     parts.shift();
     merged = parts.join(",");
   }
-  if (merged.length > TRACE_STATE_LIMIT) merged = merged.slice(0, TRACE_STATE_LIMIT);
+  if (merged.length > TRACE_STATE_LIMIT) {
+    merged = merged.slice(0, TRACE_STATE_LIMIT);
+  }
   return merged;
 }
 
-function recordSpan(traceId: string, name: string, parentSpanId: string | null, sampled: boolean): string {
+function recordSpan(
+  traceId: string,
+  name: string,
+  parentSpanId: string | null,
+  sampled: boolean
+): string {
   const spanId = randomHex(8);
   const list = traces.get(traceId) ?? [];
-  list.push({ span_id: spanId, trace_id: traceId, parent_span_id: parentSpanId, name, sampled });
+  list.push({
+    span_id: spanId,
+    trace_id: traceId,
+    parent_span_id: parentSpanId,
+    name,
+    sampled,
+  });
   traces.set(traceId, list);
   return spanId;
 }
 
-async function withChildSpan<T>(name: string, fn: () => Promise<T>): Promise<T> {
+function withChildSpan<T>(name: string, fn: () => Promise<T>): Promise<T> {
   const parent = als.getStore();
-  if (!parent) throw new Error("missing trace context");
-  const spanId = recordSpan(parent.trace_id, name, parent.current_span_id, parent.sampled);
+  if (!parent) {
+    throw new Error("missing trace context");
+  }
+  const spanId = recordSpan(
+    parent.trace_id,
+    name,
+    parent.current_span_id,
+    parent.sampled
+  );
   const childCtx: TraceContext = {
     trace_id: parent.trace_id,
     current_span_id: spanId,
@@ -105,20 +150,31 @@ Bun.serve({
       const tracestate = mergeTracestate(tracestateHeader, "");
       const rootParent = inbound?.parent_span_id ?? null;
       const rootSpanId = recordSpan(traceId, "ingress", rootParent, sampled);
-      const active: TraceContext = { trace_id: traceId, current_span_id: rootSpanId, sampled, tracestate };
+      const active: TraceContext = {
+        trace_id: traceId,
+        current_span_id: rootSpanId,
+        sampled,
+        tracestate,
+      };
 
       await als.run(active, async () => {
         await downstreamA();
         await downstreamB();
       });
 
-      return Response.json({ trace_id: traceId, root_span_id: rootSpanId, sampled, tracestate }, { status: 200 });
+      return Response.json(
+        { trace_id: traceId, root_span_id: rootSpanId, sampled, tracestate },
+        { status: 200 }
+      );
     }
 
-    const traceMatch = /^\/trace\/([0-9a-f]{32})$/.exec(url.pathname);
-    if (request.method === "GET" && traceMatch) {
-      const traceId = traceMatch[1]!;
-      return Response.json({ trace_id: traceId, spans: traces.get(traceId) ?? [] }, { status: 200 });
+    const traceMatch = TRACE_PATH_RE.exec(url.pathname);
+    if (request.method === "GET" && traceMatch?.[1] !== undefined) {
+      const traceId = traceMatch[1];
+      return Response.json(
+        { trace_id: traceId, spans: traces.get(traceId) ?? [] },
+        { status: 200 }
+      );
     }
 
     return Response.json({ error: "not_found" }, { status: 404 });

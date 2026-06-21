@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
-async function setMode(baseUrl: string, mode: string) {
+function setMode(baseUrl: string, mode: string) {
   return fetch(`${baseUrl}/dependency`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -27,7 +27,9 @@ describe("circuit breaker — basics", () => {
   });
 
   test("GET /breaker reports the initial closed state", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/breaker`);
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -37,7 +39,9 @@ describe("circuit breaker — basics", () => {
   });
 
   test("GET /call succeeds in mode up with attempts 1", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/call`);
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -47,14 +51,18 @@ describe("circuit breaker — basics", () => {
   });
 
   test("POST /dependency sets the mode and is echoed back", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await setMode(server.baseUrl, "down");
     expect(response.status).toBe(200);
     expect((await response.json()).mode).toBe("down");
   });
 
   test("GET /call with mode down retries and reports attempts 3 then 502", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await setMode(server.baseUrl, "down");
     const before = (await breaker(server.baseUrl)).dependency_calls;
     const response = await fetch(`${server.baseUrl}/call`);
@@ -67,7 +75,9 @@ describe("circuit breaker — basics", () => {
   });
 
   test("POST /call with mode down is NOT retried (attempts 1, +1 invocation)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     await setMode(server.baseUrl, "down");
     const before = (await breaker(server.baseUrl)).dependency_calls;
     const response = await fetch(`${server.baseUrl}/call`, { method: "POST" });

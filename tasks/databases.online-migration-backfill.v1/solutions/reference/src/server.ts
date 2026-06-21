@@ -2,24 +2,35 @@ import { randomUUID } from "node:crypto";
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-type Phase = "legacy_only" | "dual_write" | "backfilling" | "cutover" | "rolled_back";
+const RECORD_RE = /^\/records\/([^/]+)$/;
 
-type RecordRow = {
+type Phase =
+  | "legacy_only"
+  | "dual_write"
+  | "backfilling"
+  | "cutover"
+  | "rolled_back";
+
+interface RecordRow {
+  backfill_version: number | null;
   id: string;
   legacy_value: number;
   normalized_value: number | null;
   write_version: number;
-  backfill_version: number | null;
-};
+}
 
 let phase: Phase = "legacy_only";
 const records = new Map<string, RecordRow>();
 let backfillComplete = false;
 
 function allRowsBackfilled(): boolean {
-  if (records.size === 0) return true;
+  if (records.size === 0) {
+    return true;
+  }
   return [...records.values()].every(
-    (row) => row.normalized_value !== null && row.backfill_version === row.write_version,
+    (row) =>
+      row.normalized_value !== null &&
+      row.backfill_version === row.write_version
   );
 }
 
@@ -27,7 +38,10 @@ function readValue(row: RecordRow): number {
   if (phase === "cutover") {
     return row.normalized_value ?? row.legacy_value;
   }
-  if (row.normalized_value !== null && (phase === "dual_write" || phase === "backfilling")) {
+  if (
+    row.normalized_value !== null &&
+    (phase === "dual_write" || phase === "backfilling")
+  ) {
     return row.normalized_value;
   }
   return row.legacy_value;
@@ -36,7 +50,11 @@ function readValue(row: RecordRow): number {
 function writeRecord(row: RecordRow, legacyValue: number): void {
   row.legacy_value = legacyValue;
   row.write_version += 1;
-  if (phase === "dual_write" || phase === "backfilling" || phase === "cutover") {
+  if (
+    phase === "dual_write" ||
+    phase === "backfilling" ||
+    phase === "cutover"
+  ) {
     row.normalized_value = legacyValue * 2;
   }
 }
@@ -67,7 +85,7 @@ Bun.serve({
           backfill_complete: backfillComplete,
           record_count: records.size,
         },
-        { status: 200 },
+        { status: 200 }
       );
     }
 
@@ -90,13 +108,20 @@ Bun.serve({
       phase = "backfilling";
       const batch = Number(url.searchParams.get("batch") ?? "10");
       const limit = Number.isInteger(batch) && batch > 0 ? batch : 10;
-      const rows = [...records.values()].sort((a, b) => a.id.localeCompare(b.id));
+      const rows = [...records.values()].sort((a, b) =>
+        a.id.localeCompare(b.id)
+      );
       let processed = 0;
       let skipped = 0;
 
       for (const row of rows) {
-        if (processed >= limit) break;
-        if (row.normalized_value !== null && row.backfill_version === row.write_version) {
+        if (processed >= limit) {
+          break;
+        }
+        if (
+          row.normalized_value !== null &&
+          row.backfill_version === row.write_version
+        ) {
           skipped += 1;
           continue;
         }
@@ -112,7 +137,10 @@ Bun.serve({
 
       backfillComplete = allRowsBackfilled();
 
-      return Response.json({ processed, skipped, backfill_complete: backfillComplete }, { status: 200 });
+      return Response.json(
+        { processed, skipped, backfill_complete: backfillComplete },
+        { status: 200 }
+      );
     }
 
     if (request.method === "POST" && url.pathname === "/migration/cutover") {
@@ -144,13 +172,16 @@ Bun.serve({
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const record = body as Record<string, unknown> | null;
-      if (!record || !Number.isInteger(record.legacy_value)) {
+      if (!(record && Number.isInteger(record.legacy_value))) {
         return Response.json({ error: "invalid_body" }, { status: 422 });
       }
       const row: RecordRow = {
         id: randomUUID(),
         legacy_value: record.legacy_value as number,
-        normalized_value: phase === "legacy_only" || phase === "rolled_back" ? null : (record.legacy_value as number) * 2,
+        normalized_value:
+          phase === "legacy_only" || phase === "rolled_back"
+            ? null
+            : (record.legacy_value as number) * 2,
         write_version: 1,
         backfill_version: null,
       };
@@ -158,9 +189,9 @@ Bun.serve({
       return Response.json(publicRecord(row), { status: 201 });
     }
 
-    const recordMatch = /^\/records\/([^/]+)$/.exec(url.pathname);
+    const recordMatch = RECORD_RE.exec(url.pathname);
     if (recordMatch) {
-      const id = decodeURIComponent(recordMatch[1]!);
+      const id = decodeURIComponent(recordMatch[1] as string);
       const row = records.get(id);
       if (!row) {
         return Response.json({ error: "not_found" }, { status: 404 });
@@ -178,7 +209,7 @@ Bun.serve({
           return Response.json({ error: "invalid_body" }, { status: 422 });
         }
         const record = body as Record<string, unknown> | null;
-        if (!record || !Number.isInteger(record.legacy_value)) {
+        if (!(record && Number.isInteger(record.legacy_value))) {
           return Response.json({ error: "invalid_body" }, { status: 422 });
         }
         writeRecord(row, record.legacy_value as number);

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 async function createUser(baseUrl: string, name: string, email: string) {
   const response = await fetch(`${baseUrl}/users`, {
@@ -22,7 +22,9 @@ describe("schema migrations", () => {
   });
 
   test("reports version 3 with the applied migrations in order", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/schema/version`);
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -35,8 +37,14 @@ describe("schema migrations", () => {
   });
 
   test("creates a user with name and email and reads it back", async () => {
-    if (!server) throw new Error("server did not start");
-    const { response, user } = await createUser(server.baseUrl, "alice", "alice@example.com");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const { response, user } = await createUser(
+      server.baseUrl,
+      "alice",
+      "alice@example.com"
+    );
     expect(response.status).toBe(201);
     expect(user.name).toBe("alice");
     expect(user.email).toBe("alice@example.com");
@@ -45,11 +53,17 @@ describe("schema migrations", () => {
     const read = await fetch(`${server.baseUrl}/users/${user.id}`);
     expect(read.status).toBe(200);
     const fetched = await read.json();
-    expect(fetched).toEqual({ id: user.id, name: "alice", email: "alice@example.com" });
+    expect(fetched).toEqual({
+      id: user.id,
+      name: "alice",
+      email: "alice@example.com",
+    });
   });
 
   test("unknown user returns 404", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/users/999999`);
     expect(response.status).toBe(404);
   });

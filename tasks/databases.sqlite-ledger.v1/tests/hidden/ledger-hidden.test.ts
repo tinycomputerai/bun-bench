@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
-async function createAccount(baseUrl: string, name: string, initial_balance?: number) {
+async function createAccount(
+  baseUrl: string,
+  name: string,
+  initial_balance?: number
+) {
   const body: Record<string, unknown> = { name };
-  if (initial_balance !== undefined) body.initial_balance = initial_balance;
+  if (initial_balance !== undefined) {
+    body.initial_balance = initial_balance;
+  }
   const response = await fetch(`${baseUrl}/accounts`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -37,7 +43,9 @@ describe("ledger invariants", () => {
   });
 
   test("insufficient-funds transfer leaves both balances unchanged (atomicity)", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const from = await createAccount(server.baseUrl, "poor", 30);
     const to = await createAccount(server.baseUrl, "rich", 1000);
 
@@ -50,7 +58,9 @@ describe("ledger invariants", () => {
   });
 
   test("total balance is conserved across several transfers", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const a = await createAccount(server.baseUrl, "a", 300);
     const b = await createAccount(server.baseUrl, "b", 200);
     const c = await createAccount(server.baseUrl, "c", 0);
@@ -70,7 +80,9 @@ describe("ledger invariants", () => {
   });
 
   test("concurrent transfers from the same account never overdraw it", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     // Source holds 100; two simultaneous 70-transfers (total 140 > 100) are fired.
     // At most one may succeed; the balance must never go negative.
     const src = await createAccount(server.baseUrl, "src", 100);
@@ -102,7 +114,9 @@ describe("ledger invariants", () => {
   });
 
   test("same-account transfer is rejected and amount must be a positive integer", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const acct = await createAccount(server.baseUrl, "self", 100);
 
     const same = await transfer(server.baseUrl, acct.id, acct.id, 10);
@@ -110,8 +124,12 @@ describe("ledger invariants", () => {
     expect((await same.json()).error).toBe("same_account");
 
     const other = await createAccount(server.baseUrl, "other", 0);
-    expect((await transfer(server.baseUrl, acct.id, other.id, 0)).status).toBe(422);
-    expect((await transfer(server.baseUrl, acct.id, other.id, -5)).status).toBe(422);
+    expect((await transfer(server.baseUrl, acct.id, other.id, 0)).status).toBe(
+      422
+    );
+    expect((await transfer(server.baseUrl, acct.id, other.id, -5)).status).toBe(
+      422
+    );
 
     const notInt = await fetch(`${server.baseUrl}/transfers`, {
       method: "POST",
@@ -122,14 +140,16 @@ describe("ledger invariants", () => {
   });
 
   test("transfer to or from an unknown account returns 404 account_not_found", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const acct = await createAccount(server.baseUrl, "known", 100);
 
-    const missingTo = await transfer(server.baseUrl, acct.id, 999999, 10);
+    const missingTo = await transfer(server.baseUrl, acct.id, 999_999, 10);
     expect(missingTo.status).toBe(404);
     expect((await missingTo.json()).error).toBe("account_not_found");
 
-    const missingFrom = await transfer(server.baseUrl, 999999, acct.id, 10);
+    const missingFrom = await transfer(server.baseUrl, 999_999, acct.id, 10);
     expect(missingFrom.status).toBe(404);
 
     // The known account must be untouched by the failed transfers.
@@ -137,7 +157,9 @@ describe("ledger invariants", () => {
   });
 
   test("negative or non-integer initial_balance is rejected", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const negative = await fetch(`${server.baseUrl}/accounts`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -154,10 +176,14 @@ describe("ledger invariants", () => {
   });
 
   test("balances persist across a process restart", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const from = await createAccount(server.baseUrl, "persist-src", 200);
     const to = await createAccount(server.baseUrl, "persist-dst", 0);
-    expect((await transfer(server.baseUrl, from.id, to.id, 75)).status).toBe(200);
+    expect((await transfer(server.baseUrl, from.id, to.id, 75)).status).toBe(
+      200
+    );
 
     await server.stop();
     server = await startTaskServer();

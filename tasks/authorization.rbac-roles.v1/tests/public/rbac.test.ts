@@ -1,11 +1,19 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { startTaskServer, type RunningServer } from "../helpers/server";
+import { type RunningServer, startTaskServer } from "../helpers/server";
 
 function auth(token: string): Record<string, string> {
-  return { authorization: `Bearer ${token}`, "content-type": "application/json" };
+  return {
+    authorization: `Bearer ${token}`,
+    "content-type": "application/json",
+  };
 }
 
-async function createDoc(baseUrl: string, token: string, title = "t", body = "b") {
+async function createDoc(
+  baseUrl: string,
+  token: string,
+  title = "t",
+  body = "b"
+) {
   const response = await fetch(`${baseUrl}/documents`, {
     method: "POST",
     headers: auth(token),
@@ -26,8 +34,15 @@ describe("rbac document store", () => {
   });
 
   test("editor can create a document owned by themselves", async () => {
-    if (!server) throw new Error("server did not start");
-    const response = await createDoc(server.baseUrl, "tok-editor", "hello", "world");
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const response = await createDoc(
+      server.baseUrl,
+      "tok-editor",
+      "hello",
+      "world"
+    );
     expect(response.status).toBe(201);
     const doc = await response.json();
     expect(doc.owner).toBe("editor");
@@ -37,8 +52,12 @@ describe("rbac document store", () => {
   });
 
   test("any authenticated role can read a document", async () => {
-    if (!server) throw new Error("server did not start");
-    const created = await (await createDoc(server.baseUrl, "tok-editor")).json();
+    if (!server) {
+      throw new Error("server did not start");
+    }
+    const created = await (
+      await createDoc(server.baseUrl, "tok-editor")
+    ).json();
     const response = await fetch(`${server.baseUrl}/documents/${created.id}`, {
       headers: { authorization: "Bearer tok-viewer" },
     });
@@ -49,7 +68,9 @@ describe("rbac document store", () => {
   });
 
   test("missing token returns 401 unauthorized", async () => {
-    if (!server) throw new Error("server did not start");
+    if (!server) {
+      throw new Error("server did not start");
+    }
     const response = await fetch(`${server.baseUrl}/documents/0`);
     expect(response.status).toBe(401);
     expect((await response.json()).error).toBe("unauthorized");
